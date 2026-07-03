@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/dillan/sk-image/actions/workflows/ci.yml/badge.svg)](https://github.com/dillan/sk-image/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://prettier.io)
 
-SK Image is a Signal K server plugin that stores and serves images for your vessel — logos, cabin diagrams, deck plans, safety cards, reference photos. It validates uploads, re-encodes and resizes them to WebP on demand, keeps a size-capped disk cache, and exposes a small REST API. It is built to back the KIP **Image** widget, but any Signal K web app can use it.
+SK Image is a Signal K server plugin that stores and serves images for your vessel — logos, cabin diagrams, deck plans, safety cards, reference photos. It validates uploads, re-encodes and resizes them to WebP on demand, keeps a size-capped disk cache, and exposes a small REST API. It ships its own web-app image library — browse, upload, view EXIF, and organize into collections — served at `/sk-image`, and is also built to back the KIP **Image** widget.
 
 ## Why you need it
 

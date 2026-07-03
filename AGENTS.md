@@ -10,6 +10,7 @@ A Signal K server plugin (CommonJS, TypeScript) that stores and serves a vessel 
 
 ```bash
 npm run build          # tsc -> dist/
+npm run build:webapp   # build the React web app -> public/
 npm test               # vitest run
 npm run test:coverage  # vitest + v8 coverage (thresholds enforced)
 npm run lint           # eslint (flat config)
@@ -23,7 +24,9 @@ npm run format         # prettier --write .
 - `src/images/image-store.ts` — validation, storage, on-demand serving, cache stats/purge. No Express.
 - `src/images/metadata-store.ts` — SQLite metadata layer (isolated so the driver is swappable).
 - `src/images/image-processing.ts` — pure convert/resize (sharp + heic-convert), width allow-list.
+- `src/images/exif.ts` — EXIF extraction (exifr) on upload.
 - `src/images/worker-pool.ts` / `image-worker.ts` — worker-thread pool for image processing.
+- `webapp/` — the React + Vite web-app library (its own project; builds to `public/`, served at `/sk-image`).
 - Tests are `src/**/*.spec.ts`; worker tests use `src/images/__fixtures__/fake-worker.cjs`.
 
 ## Conventions

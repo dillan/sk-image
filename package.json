@@ -6,6 +6,7 @@
   "license": "MIT",
   "keywords": [
     "signalk-node-server-plugin",
+    "signalk-webapp",
     "signalk-category-utility",
     "image",
     "images",
@@ -21,6 +22,7 @@
   },
   "files": [
     "dist",
+    "public",
     "README.md",
     "LICENSE"
   ],
@@ -33,12 +35,14 @@
   },
   "homepage": "https://github.com/dillan/sk-image#readme",
   "signalk": {
-    "displayName": "SK Image"
+    "displayName": "SK Image",
+    "appIcon": "icon.svg"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:webapp": "npm --prefix webapp run build",
     "dev": "tsc -p tsconfig.json --watch",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist public",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -46,7 +50,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "node scripts/prepare.mjs",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm --prefix webapp ci && npm run build:webapp && npm run build"
   },
   "simple-git-hooks": {
     "pre-commit": "npx lint-staged",

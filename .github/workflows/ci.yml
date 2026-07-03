@@ -25,6 +25,11 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:coverage
+      # Web app (its own project + lockfile)
+      - run: npm --prefix webapp ci
+      - run: npm --prefix webapp run lint
+      - run: npm --prefix webapp run test
+      - run: npm run build:webapp
 
   commitlint:
     if: github.event_name == 'pull_request'

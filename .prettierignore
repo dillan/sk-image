@@ -1,4 +1,5 @@
 dist/
+public/
 coverage/
 package-lock.json
 CHANGELOG.md

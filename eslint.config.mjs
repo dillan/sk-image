@@ -4,7 +4,16 @@ import tseslint from 'typescript-eslint';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'src/**/__fixtures__/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'public/**',
+      'webapp/**',
+      'node_modules/**',
+      'coverage/**',
+      'src/**/__fixtures__/**',
+    ],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {

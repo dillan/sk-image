@@ -1,0 +1,38 @@
+name: Bug report
+description: Something in SK Image isn't working as expected.
+labels: ['bug']
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, and what went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence of steps that triggers the problem.
+  - type: input
+    id: sk-image-version
+    attributes:
+      label: SK Image version
+      placeholder: e.g. 1.2.0
+    validations:
+      required: true
+  - type: input
+    id: signalk-version
+    attributes:
+      label: Signal K server version
+      placeholder: e.g. 2.30.0
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version, browser (for the web app), and how the server is deployed.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      render: shell

@@ -25,6 +25,16 @@ Override the port with `SIGNALK_PORT` (default `3007`):
 SIGNALK_PORT=3010 ./capture.sh
 ```
 
+### The KIP widget screenshot
+
+The KIP **Image** widget's configuration screenshot comes from a separate app (KIP), so it has its own script. It needs a KIP checkout that includes the Image widget:
+
+```bash
+KIP_DIR=/path/to/kip ./capture-kip.sh
+```
+
+This reuses the Docker SK Image server, builds and serves the KIP app, and drives it with Playwright to write `../docs/images/kip-widget-config.webp`. See [`../docs/developers/screenshots.md`](../docs/developers/screenshots.md) for how it works.
+
 ## What it does
 
 `capture.sh` runs these steps in order:
@@ -54,14 +64,17 @@ No real hostnames, positions, vessel names, or personal data appear anywhere in 
 
 ## Layout
 
-| Path                         | Role                                                              |
-| ---------------------------- | ----------------------------------------------------------------- |
-| `capture.sh`                 | orchestration entry point                                         |
-| `Dockerfile`                 | Signal K server image with the plugin + Linux deps + baked config |
-| `docker-compose.yml`         | builds and runs the stack                                         |
-| `signalk-config/`            | the baked `settings.json` and `plugin-config-data/sk-image.json`  |
-| `seed.mjs`                   | generates and uploads sample images + collections                 |
-| `screenshots.config.ts`      | Playwright configuration                                          |
-| `screenshots/webapp.spec.ts` | the capture specs                                                 |
-| `screenshots/harness.ts`     | the `shot()` helper                                               |
-| `scripts/to-webp.mjs`        | PNG → WebP conversion into `../docs/images/`                      |
+| Path | Role |
+| --- | --- |
+| `capture.sh` | orchestration entry point |
+| `Dockerfile` | Signal K server image with the plugin + Linux deps + baked config |
+| `docker-compose.yml` | builds and runs the stack |
+| `signalk-config/` | the baked `settings.json` and `plugin-config-data/sk-image.json` |
+| `seed.mjs` | generates and uploads sample images + collections |
+| `screenshots.config.ts` | Playwright configuration |
+| `screenshots/webapp.spec.ts` | the capture specs |
+| `screenshots/harness.ts` | the `shot()` helper |
+| `scripts/to-webp.mjs` | PNG → WebP conversion into `../docs/images/` |
+| `capture-kip.sh` | captures the KIP Image-widget config screenshot (needs a KIP checkout) |
+| `kip/serve-kip.mjs` | static server for a built KIP app |
+| `kip/capture-kip.mjs` | Playwright capture of the KIP widget config dialog |

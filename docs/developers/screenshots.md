@@ -54,6 +54,18 @@ Playwright emits PNG; `e2e/scripts/to-webp.mjs` converts the curated set to WebP
 
 ---
 
+## The KIP widget screenshot
+
+One image — the KIP **Image** widget's configuration dialog (`kip-widget-config.webp`) — comes from a different app. KIP is a separate Signal K dashboard that hosts an Image widget backed by this plugin, so capturing its config UI means driving KIP, not the SK Image web app. It runs as its own flow and needs a KIP checkout that ships the Image widget (`requiredPlugins: ['sk-image']`):
+
+```bash
+KIP_DIR=/path/to/kip ./capture-kip.sh
+```
+
+`capture-kip.sh` brings up the same Docker SK Image server and seeds it, builds and statically serves the KIP app (`kip/serve-kip.mjs`), then drives KIP with Playwright (`kip/capture-kip.mjs`): it injects a KIP config that points at the SK Image server with one Image widget pre-placed, opens that widget's options dialog, and writes `docs/images/kip-widget-config.webp`. KIP and the server run on different origins, so this relies on the server's permissive local CORS (security is off in the harness).
+
+---
+
 ## Files
 
 | File | Role |
@@ -67,6 +79,9 @@ Playwright emits PNG; `e2e/scripts/to-webp.mjs` converts the curated set to WebP
 | `e2e/screenshots/webapp.spec.ts` | the capture specs |
 | `e2e/screenshots/harness.ts` | the `shot()` helper |
 | `e2e/scripts/to-webp.mjs` | PNG → WebP conversion into `docs/images/` |
+| `e2e/capture-kip.sh` | captures the KIP Image-widget config screenshot (needs a KIP checkout) |
+| `e2e/kip/serve-kip.mjs` | static server for a built KIP app |
+| `e2e/kip/capture-kip.mjs` | Playwright capture of the KIP widget config dialog |
 
 See [`e2e/README.md`](../../e2e/README.md) for the operational details and troubleshooting.
 

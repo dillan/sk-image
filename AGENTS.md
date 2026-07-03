@@ -1,0 +1,42 @@
+# AGENTS.md
+
+A terse map of this repo for AI agents and new contributors.
+
+## What this is
+
+A Signal K server plugin (CommonJS, TypeScript) that stores and serves a vessel image library: secure upload + content validation, on-demand resize/re-encode to WebP, a size-capped on-disk cache, and a REST API under `/plugins/sk-image`. Image bytes live on disk; metadata lives in an SQLite database (`node:sqlite`) beside them.
+
+## Commands
+
+```bash
+npm run build          # tsc -> dist/
+npm test               # vitest run
+npm run test:coverage  # vitest + v8 coverage (thresholds enforced)
+npm run lint           # eslint (flat config)
+npm run format         # prettier --write .
+```
+
+## Source layout
+
+- `src/index.ts` — plugin entry (`export = (app) => Plugin`): id/name/schema, lazy store + worker pool, `registerWithRouter`.
+- `src/images/image-router.ts` — Express routes + auth gate + the `/config` capabilities endpoint.
+- `src/images/image-store.ts` — validation, storage, on-demand serving, cache stats/purge. No Express.
+- `src/images/metadata-store.ts` — SQLite metadata layer (isolated so the driver is swappable).
+- `src/images/image-processing.ts` — pure convert/resize (sharp + heic-convert), width allow-list.
+- `src/images/worker-pool.ts` / `image-worker.ts` — worker-thread pool for image processing.
+- Tests are `src/**/*.spec.ts`; worker tests use `src/images/__fixtures__/fake-worker.cjs`.
+
+## Conventions
+
+- Node >= 24 (the built-in `node:sqlite` is only un-flagged from Node 24). CommonJS output (`module: node16`, no `"type"`).
+- Vitest specs co-located with source. Add a failing spec before implementing.
+- Conventional Commits; releases via semantic-release.
+- Prettier (single quotes, width 100) + ESLint flat config gate every change.
+
+## Security invariants (do not weaken)
+
+- Upload type is decided by **content sniffing**, never the client filename or MIME.
+- Raster originals are **never** served raw — always re-encoded to WebP on the way out.
+- SVGs are **sanitized** (DOMPurify) on ingest; scripts/event handlers/external refs are stripped.
+- On-disk names are generated UUIDs; the client filename is stored only as display metadata, never used to build a path.
+- Upload / delete / cache-purge require an authenticated principal when server security is on.

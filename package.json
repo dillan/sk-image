@@ -1,0 +1,96 @@
+{
+  "name": "sk-image",
+  "version": "0.1.0",
+  "description": "Signal K image library plugin: secure upload, on-demand resize/re-encode, disk cache, and a web-app image manager.",
+  "author": "Dillan Laughlin",
+  "license": "MIT",
+  "keywords": [
+    "signalk-node-server-plugin",
+    "signalk-webapp",
+    "signalk-category-utility",
+    "image",
+    "images",
+    "gallery",
+    "exif",
+    "kip"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "files": [
+    "dist",
+    "public",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dillan/sk-image.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dillan/sk-image/issues"
+  },
+  "homepage": "https://github.com/dillan/sk-image#readme",
+  "signalk": {
+    "displayName": "SK Image",
+    "appIcon": "icon.svg"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:webapp": "npm --prefix webapp run build",
+    "dev": "tsc -p tsconfig.json --watch",
+    "clean": "rm -rf dist public",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "node scripts/prepare.mjs",
+    "prepublishOnly": "npm --prefix webapp ci && npm run build:webapp && npm run build"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged",
+    "commit-msg": "npx --no-install commitlint --edit \"$1\""
+  },
+  "lint-staged": {
+    "*.{ts,js,cjs,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "exifr": "^7.1.3",
+    "heic-convert": "^2.1.0",
+    "isomorphic-dompurify": "^3.18.0",
+    "multer": "^2.2.0",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.1.0",
+    "@commitlint/config-conventional": "^21.1.0",
+    "@eslint/js": "^10.0.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@signalk/server-api": "^2.30.0",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^24.13.2",
+    "@vitest/coverage-v8": "^4.1.9",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.9.1",
+    "semantic-release": "^25.0.5",
+    "simple-git-hooks": "^2.13.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.0",
+    "vitest": "^4.1.9"
+  }
+}

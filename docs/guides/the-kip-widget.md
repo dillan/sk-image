@@ -25,6 +25,10 @@ The **Image** widget needs the `sk-image` plugin running on your Signal K server
 
 Open the widget settings. Pick an image from the shared library, or upload a new one right there. The widget shows the image scaled to fit its space on the dashboard.
 
+<p align="center"><img src="../images/kip-widget-config.webp" alt="The KIP Image widget options dialog showing the shared boat image library as a grid of thumbnails with one selected, an Upload button, a scaling choice, a description field, and a live preview of the selected image." width="85%"></p>
+
+The library you see here is the same one the [SK Image app](the-app.md) manages — upload a picture in either place and it shows up in both.
+
 ---
 
 ## Where to next

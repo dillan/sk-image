@@ -9,7 +9,8 @@ import {
   inProcessProcessor,
   type ImageProcessor,
 } from './image-processing';
-import { MetadataStore } from './metadata-store';
+import { MetadataStore, type ListImagesOptions, type Collection } from './metadata-store';
+import { extractExif, serializeExif } from './exif';
 
 /**
  * ImageStore — secure, testable core for the KIP image-asset feature.
@@ -72,6 +73,13 @@ export interface ImageMeta {
   animated: boolean;
   createdAt: string; // ISO timestamp
   uploadedBy?: string | null;
+  // EXIF-derived (Milestone 2), all nullable — most images carry little or no EXIF.
+  captureDate?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+  cameraMake?: string | null;
+  cameraModel?: string | null;
+  orientation?: number | null;
 }
 
 export class ImageValidationError extends Error {
@@ -320,18 +328,63 @@ export class ImageStore {
 
     const ext = EXT_BY_FORMAT[meta.format];
     await fs.writeFile(path.join(this.originalsDir, `${id}.${ext}`), bytesToStore);
-    this.meta.insert(meta);
+
+    // Extract EXIF from the ORIGINAL upload bytes (a transcoded HEIC->WebP would have lost it).
+    const exif = await extractExif(buffer);
+    meta.captureDate = exif.captureDate;
+    meta.lat = exif.lat;
+    meta.lon = exif.lon;
+    meta.cameraMake = exif.cameraMake;
+    meta.cameraModel = exif.cameraModel;
+    meta.orientation = exif.orientation;
+    this.meta.insert(meta, serializeExif(exif.raw));
     return meta;
   }
 
-  /** Read all stored image metadata (the shared library), oldest first. */
-  async list(): Promise<ImageMeta[]> {
-    return this.meta.list();
+  /** List stored image metadata, optionally filtered to a collection and sorted. */
+  async list(opts: ListImagesOptions = {}): Promise<ImageMeta[]> {
+    return this.meta.list(opts);
   }
 
   async getMeta(id: string): Promise<ImageMeta | null> {
     if (!isValidId(id)) return null;
     return this.meta.get(id);
+  }
+
+  /** Full raw EXIF for one image (null when none was captured). */
+  async getExif(id: string): Promise<unknown | null> {
+    if (!isValidId(id)) return null;
+    return this.meta.getExif(id);
+  }
+
+  // --- collections (Milestone 2) ----------------------------------------------------------------
+
+  listCollections(): Collection[] {
+    return this.meta.listCollections();
+  }
+  getCollection(id: string): Collection | null {
+    return isValidId(id) ? this.meta.getCollection(id) : null;
+  }
+  createCollection(name: string): Collection {
+    const id = randomUUID();
+    this.meta.createCollection(id, name, new Date().toISOString());
+    return this.meta.getCollection(id) as Collection;
+  }
+  renameCollection(id: string, name: string): boolean {
+    return isValidId(id) ? this.meta.renameCollection(id, name) : false;
+  }
+  deleteCollection(id: string): boolean {
+    return isValidId(id) ? this.meta.deleteCollection(id) : false;
+  }
+  addImageToCollection(collectionId: string, imageId: string): boolean {
+    return isValidId(collectionId) && isValidId(imageId)
+      ? this.meta.addImageToCollection(collectionId, imageId)
+      : false;
+  }
+  removeImageFromCollection(collectionId: string, imageId: string): boolean {
+    return isValidId(collectionId) && isValidId(imageId)
+      ? this.meta.removeImageFromCollection(collectionId, imageId)
+      : false;
   }
 
   /** Path to the stored original (for the serving layer). */

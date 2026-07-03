@@ -246,3 +246,201 @@ test('routes return 503 when the store is not ready', async () => {
   await res.done;
   expect(res.statusCode).toBe(503);
 });
+
+test('GET /images honours the sort + order query', async () => {
+  const { store, router } = setup();
+  await store.ingest(await png(), 'bravo.png');
+  await store.ingest(await png(), 'alpha.png');
+  const res = createResMock();
+  router.getHandlers.get('/images')!({ query: { sort: 'name', order: 'asc' } }, res);
+  await res.done;
+  expect((res.jsonBody as { name: string }[]).map((m) => m.name)).toEqual([
+    'alpha.png',
+    'bravo.png',
+  ]);
+});
+
+test('GET /images/:id/exif returns EXIF for an image and 404s an unknown id', async () => {
+  const { store, router } = setup();
+  const meta = await store.ingest(await png(), 'm.png');
+  const res = createResMock();
+  router.getHandlers.get('/images/:id/exif')!({ params: { id: meta.id } }, res);
+  await res.done;
+  expect(res.statusCode).toBe(200);
+
+  const missing = createResMock();
+  router.getHandlers.get('/images/:id/exif')!({ params: { id: 'nope-0000' } }, missing);
+  await missing.done;
+  expect(missing.statusCode).toBe(404);
+});
+
+test('collections: create (auth), add image, filtered list, and counts', async () => {
+  const { store, router } = setup();
+  const img = await store.ingest(await png(), 'a.png');
+
+  const created = createResMock();
+  router.postHandlers.get('/collections')!(
+    { skIsAuthenticated: true, body: { name: 'Deck' } },
+    created,
+  );
+  await created.done;
+  expect(created.statusCode).toBe(201);
+  const colId = (created.jsonBody as { id: string }).id;
+
+  const add = createResMock();
+  router.postHandlers.get('/collections/:id/images/:imageId')!(
+    { skIsAuthenticated: true, params: { id: colId, imageId: img.id } },
+    add,
+  );
+  await add.done;
+  expect(add.statusCode).toBe(200);
+
+  const listed = createResMock();
+  router.getHandlers.get('/images')!({ query: { collection: colId } }, listed);
+  await listed.done;
+  expect((listed.jsonBody as { id: string }[]).map((m) => m.id)).toEqual([img.id]);
+
+  const cols = createResMock();
+  router.getHandlers.get('/collections')!({}, cols);
+  await cols.done;
+  const found = (cols.jsonBody as { id: string; imageCount: number }[]).find((c) => c.id === colId);
+  expect(found?.imageCount).toBe(1);
+});
+
+test('POST /collections rejects anonymous and empty names', async () => {
+  const { router } = setup();
+  const anon = createResMock();
+  router.postHandlers.get('/collections')!({ skIsAuthenticated: false, body: { name: 'X' } }, anon);
+  await anon.done;
+  expect(anon.statusCode).toBe(401);
+
+  const empty = createResMock();
+  router.postHandlers.get('/collections')!(
+    { skIsAuthenticated: true, body: { name: '   ' } },
+    empty,
+  );
+  await empty.done;
+  expect(empty.statusCode).toBe(400);
+});
+
+test('PUT /collections/:id renames — 200 ok, 404 unknown, 400 bad id, 401 anon', async () => {
+  const { store, router } = setup();
+  const created = createResMock();
+  router.postHandlers.get('/collections')!(
+    { skIsAuthenticated: true, body: { name: 'Deck' } },
+    created,
+  );
+  await created.done;
+  const id = (created.jsonBody as { id: string }).id;
+
+  const ok = createResMock();
+  router.putHandlers.get('/collections/:id')!(
+    { skIsAuthenticated: true, params: { id }, body: { name: 'Deck plans' } },
+    ok,
+  );
+  await ok.done;
+  expect(ok.statusCode).toBe(200);
+  expect(store.getCollection(id)?.name).toBe('Deck plans');
+
+  const notFound = createResMock();
+  router.putHandlers.get('/collections/:id')!(
+    { skIsAuthenticated: true, params: { id: 'nope-0000' }, body: { name: 'X' } },
+    notFound,
+  );
+  await notFound.done;
+  expect(notFound.statusCode).toBe(404);
+
+  const bad = createResMock();
+  router.putHandlers.get('/collections/:id')!(
+    { skIsAuthenticated: true, params: { id: '../x' }, body: { name: 'X' } },
+    bad,
+  );
+  await bad.done;
+  expect(bad.statusCode).toBe(400);
+
+  const anon = createResMock();
+  router.putHandlers.get('/collections/:id')!(
+    { skIsAuthenticated: false, params: { id }, body: { name: 'X' } },
+    anon,
+  );
+  await anon.done;
+  expect(anon.statusCode).toBe(401);
+});
+
+test('DELETE collection + remove-image — success, 404, and auth', async () => {
+  const { store, router } = setup();
+  const img = await store.ingest(await png(), 'a.png');
+  const created = createResMock();
+  router.postHandlers.get('/collections')!(
+    { skIsAuthenticated: true, body: { name: 'Deck' } },
+    created,
+  );
+  await created.done;
+  const id = (created.jsonBody as { id: string }).id;
+  store.addImageToCollection(id, img.id);
+
+  const rm = createResMock();
+  router.deleteHandlers.get('/collections/:id/images/:imageId')!(
+    { skIsAuthenticated: true, params: { id, imageId: img.id } },
+    rm,
+  );
+  await rm.done;
+  expect(rm.statusCode).toBe(200);
+
+  const rmMissing = createResMock();
+  router.deleteHandlers.get('/collections/:id/images/:imageId')!(
+    { skIsAuthenticated: true, params: { id, imageId: img.id } },
+    rmMissing,
+  );
+  await rmMissing.done;
+  expect(rmMissing.statusCode).toBe(404);
+
+  const del = createResMock();
+  router.deleteHandlers.get('/collections/:id')!({ skIsAuthenticated: true, params: { id } }, del);
+  await del.done;
+  expect(del.statusCode).toBe(200);
+  expect(store.getCollection(id)).toBeNull();
+
+  const delMissing = createResMock();
+  router.deleteHandlers.get('/collections/:id')!(
+    { skIsAuthenticated: true, params: { id: 'nope-0000' } },
+    delMissing,
+  );
+  await delMissing.done;
+  expect(delMissing.statusCode).toBe(404);
+
+  const anon = createResMock();
+  router.deleteHandlers.get('/collections/:id')!(
+    { skIsAuthenticated: false, params: { id: 'x' } },
+    anon,
+  );
+  await anon.done;
+  expect(anon.statusCode).toBe(401);
+});
+
+test('POST add-to-collection — 400 bad id, 404 missing, 401 anon', async () => {
+  const { router } = setup();
+  const bad = createResMock();
+  router.postHandlers.get('/collections/:id/images/:imageId')!(
+    { skIsAuthenticated: true, params: { id: '../x', imageId: 'y' } },
+    bad,
+  );
+  await bad.done;
+  expect(bad.statusCode).toBe(400);
+
+  const missing = createResMock();
+  router.postHandlers.get('/collections/:id/images/:imageId')!(
+    { skIsAuthenticated: true, params: { id: 'nope-0000', imageId: 'also-0000' } },
+    missing,
+  );
+  await missing.done;
+  expect(missing.statusCode).toBe(404);
+
+  const anon = createResMock();
+  router.postHandlers.get('/collections/:id/images/:imageId')!(
+    { skIsAuthenticated: false, params: { id: 'x', imageId: 'y' } },
+    anon,
+  );
+  await anon.done;
+  expect(anon.statusCode).toBe(401);
+});

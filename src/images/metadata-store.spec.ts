@@ -28,6 +28,12 @@ function meta(over: Partial<ImageMeta> = {}): ImageMeta {
     animated: false,
     createdAt: new Date().toISOString(),
     uploadedBy: null,
+    captureDate: null,
+    lat: null,
+    lon: null,
+    cameraMake: null,
+    cameraModel: null,
+    orientation: null,
     ...over,
   };
 }
@@ -104,5 +110,125 @@ describe('MetadataStore', () => {
     db.close();
 
     expect(readdirSync(dir).some((f) => f.startsWith('metadata.db.corrupt-'))).toBe(true);
+  });
+});
+
+describe('MetadataStore — EXIF, sort, filter', () => {
+  test('persists and reads back EXIF-derived fields', () => {
+    const db = freshDb();
+    const m = meta({
+      captureDate: '2021-06-01T10:00:00.000Z',
+      lat: 47.6,
+      lon: -122.3,
+      cameraMake: 'TestCam',
+      cameraModel: 'X100',
+      orientation: 6,
+    });
+    db.insert(m);
+    expect(db.get(m.id)).toEqual(m);
+    db.close();
+  });
+
+  test('getExif round-trips the raw JSON blob', () => {
+    const db = freshDb();
+    const m = meta();
+    db.insert(m, JSON.stringify({ Make: 'TestCam', ISO: 200 }));
+    expect(db.getExif(m.id)).toEqual({ Make: 'TestCam', ISO: 200 });
+    expect(db.getExif('missing')).toBeNull();
+    db.close();
+  });
+
+  test('sorts by name and by capture date (falling back to created_at), both directions', () => {
+    const db = freshDb();
+    const a = meta({
+      name: 'alpha.png',
+      createdAt: '2020-01-01T00:00:00.000Z',
+      captureDate: '2022-01-01T00:00:00.000Z',
+    });
+    const b = meta({ name: 'bravo.png', createdAt: '2021-01-01T00:00:00.000Z', captureDate: null });
+    const c = meta({
+      name: 'charlie.png',
+      createdAt: '2019-01-01T00:00:00.000Z',
+      captureDate: '2018-01-01T00:00:00.000Z',
+    });
+    db.insert(a);
+    db.insert(b);
+    db.insert(c);
+
+    expect(db.list({ sort: 'name', order: 'asc' }).map((x) => x.name)).toEqual([
+      'alpha.png',
+      'bravo.png',
+      'charlie.png',
+    ]);
+    expect(db.list({ sort: 'name', order: 'desc' }).map((x) => x.name)).toEqual([
+      'charlie.png',
+      'bravo.png',
+      'alpha.png',
+    ]);
+    // date sort uses capture_date, falling back to created_at: c(2018) < b(created 2021) < a(2022)
+    expect(db.list({ sort: 'date', order: 'asc' }).map((x) => x.id)).toEqual([c.id, b.id, a.id]);
+    db.close();
+  });
+
+  test('filters images by collection', () => {
+    const db = freshDb();
+    const a = meta();
+    const b = meta();
+    db.insert(a);
+    db.insert(b);
+    db.createCollection('col-1', 'Deck', '2020-01-01T00:00:00.000Z');
+    db.addImageToCollection('col-1', a.id);
+    expect(db.list({ collection: 'col-1' }).map((x) => x.id)).toEqual([a.id]);
+    db.close();
+  });
+});
+
+describe('MetadataStore — collections', () => {
+  test('create, list with counts, rename, delete', () => {
+    const db = freshDb();
+    db.createCollection('c1', 'Deck plans', '2020-01-01T00:00:00.000Z');
+    db.createCollection('c2', 'Safety', '2020-01-02T00:00:00.000Z');
+    const cols = db.listCollections();
+    expect(cols.map((c) => c.name)).toEqual(['Deck plans', 'Safety']); // ordered by name
+    expect(cols.every((c) => c.imageCount === 0)).toBe(true);
+
+    expect(db.renameCollection('c1', 'Deck')).toBe(true);
+    expect(db.renameCollection('nope', 'x')).toBe(false);
+    expect(db.getCollection('c1')?.name).toBe('Deck');
+
+    expect(db.deleteCollection('c2')).toBe(true);
+    expect(db.listCollections().map((c) => c.id)).toEqual(['c1']);
+    db.close();
+  });
+
+  test('add/remove membership updates counts and reports missing entities', () => {
+    const db = freshDb();
+    const img = meta();
+    db.insert(img);
+    db.createCollection('c1', 'Deck', '2020-01-01T00:00:00.000Z');
+
+    expect(db.addImageToCollection('c1', img.id)).toBe(true);
+    expect(db.addImageToCollection('c1', img.id)).toBe(true); // idempotent
+    expect(db.getCollection('c1')?.imageCount).toBe(1);
+
+    expect(db.addImageToCollection('missing', img.id)).toBe(false);
+    expect(db.addImageToCollection('c1', 'missing')).toBe(false);
+
+    expect(db.removeImageFromCollection('c1', img.id)).toBe(true);
+    expect(db.removeImageFromCollection('c1', img.id)).toBe(false);
+    expect(db.getCollection('c1')?.imageCount).toBe(0);
+    db.close();
+  });
+
+  test('deleting an image cascades its collection membership', () => {
+    const db = freshDb();
+    const img = meta();
+    db.insert(img);
+    db.createCollection('c1', 'Deck', '2020-01-01T00:00:00.000Z');
+    db.addImageToCollection('c1', img.id);
+    expect(db.getCollection('c1')?.imageCount).toBe(1);
+    db.remove(img.id); // FK ON DELETE CASCADE removes the membership row
+    expect(db.getCollection('c1')?.imageCount).toBe(0);
+    db.close();
   });
 });

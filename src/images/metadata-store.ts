@@ -6,9 +6,9 @@ import type { ImageFormat, ImageMeta } from './image-store';
  * SQLite-backed metadata store for the image library (node:sqlite — no native deps, ships with Node).
  *
  * Image BYTES live on disk (originals + the variant cache); this owns only metadata: the image rows
- * (name, dimensions, size, timestamps and — from Milestone 2 — EXIF / GPS / capture-date) plus
- * collections. Because every row can be reconstructed from the on-disk originals, the DB is an
- * index/cache, not the source of truth for the bytes; it is safe to rebuild.
+ * (name, dimensions, size, timestamps, EXIF / GPS / capture-date) plus collections. Because every
+ * row can be reconstructed from the on-disk originals, the DB is an index/cache, not the source of
+ * truth for the bytes; it is safe to rebuild.
  *
  * The driver is deliberately isolated here so it can be swapped without touching ImageStore.
  */
@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS images (
   animated       INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
   uploaded_by    TEXT,
-  -- Milestone 2 columns (nullable; populated when EXIF / collections land)
   capture_date   TEXT,
   lat            REAL,
   lon            REAL,
@@ -55,6 +54,19 @@ CREATE TABLE IF NOT EXISTS collection_images (
 );
 `;
 
+export interface Collection {
+  id: string;
+  name: string;
+  createdAt: string;
+  imageCount: number;
+}
+
+export interface ListImagesOptions {
+  sort?: 'name' | 'date';
+  order?: 'asc' | 'desc';
+  collection?: string;
+}
+
 interface ImageRow {
   id: string;
   name: string;
@@ -65,6 +77,12 @@ interface ImageRow {
   animated: number;
   created_at: string;
   uploaded_by: string | null;
+  capture_date: string | null;
+  lat: number | null;
+  lon: number | null;
+  camera_make: string | null;
+  camera_model: string | null;
+  orientation: number | null;
 }
 
 function rowToMeta(row: ImageRow): ImageMeta {
@@ -78,6 +96,12 @@ function rowToMeta(row: ImageRow): ImageMeta {
     animated: row.animated === 1,
     createdAt: row.created_at,
     uploadedBy: row.uploaded_by ?? null,
+    captureDate: row.capture_date ?? null,
+    lat: row.lat ?? null,
+    lon: row.lon ?? null,
+    cameraMake: row.camera_make ?? null,
+    cameraModel: row.camera_model ?? null,
+    orientation: row.orientation ?? null,
   };
 }
 
@@ -113,11 +137,15 @@ export class MetadataStore {
     }
   }
 
-  insert(meta: ImageMeta): void {
+  insert(meta: ImageMeta, exifJson: string | null = null): void {
     this.db
       .prepare(
-        `INSERT INTO images (id, name, format, width, height, bytes, animated, created_at, uploaded_by)
-         VALUES (:id, :name, :format, :width, :height, :bytes, :animated, :created_at, :uploaded_by)`,
+        `INSERT INTO images
+          (id, name, format, width, height, bytes, animated, created_at, uploaded_by,
+           capture_date, lat, lon, camera_make, camera_model, orientation, exif_json)
+         VALUES
+          (:id, :name, :format, :width, :height, :bytes, :animated, :created_at, :uploaded_by,
+           :capture_date, :lat, :lon, :camera_make, :camera_model, :orientation, :exif_json)`,
       )
       .run({
         id: meta.id,
@@ -129,6 +157,13 @@ export class MetadataStore {
         animated: meta.animated ? 1 : 0,
         created_at: meta.createdAt,
         uploaded_by: meta.uploadedBy ?? null,
+        capture_date: meta.captureDate ?? null,
+        lat: meta.lat ?? null,
+        lon: meta.lon ?? null,
+        camera_make: meta.cameraMake ?? null,
+        camera_model: meta.cameraModel ?? null,
+        orientation: meta.orientation ?? null,
+        exif_json: exifJson,
       });
   }
 
@@ -138,10 +173,42 @@ export class MetadataStore {
     return row ? rowToMeta(row) : null;
   }
 
-  /** All images, oldest first (matches the previous sidecar list ordering). */
-  list(): ImageMeta[] {
+  /** Read the full raw EXIF tag set for one image (null when none was captured). */
+  getExif(id: string): unknown | null {
+    const row = this.db.prepare('SELECT exif_json FROM images WHERE id = ?').get(id) as
+      { exif_json: string | null } | undefined;
+    if (!row || !row.exif_json) return null;
+    try {
+      return JSON.parse(row.exif_json);
+    } catch {
+      return null;
+    }
+  }
+
+  /** List images, optionally filtered to a collection and sorted. Sort/order come from a fixed whitelist. */
+  list(opts: ListImagesOptions = {}): ImageMeta[] {
+    const sortCol =
+      opts.sort === 'name'
+        ? 'name'
+        : opts.sort === 'date'
+          ? 'COALESCE(capture_date, created_at)'
+          : 'created_at';
+    const dir = opts.order === 'desc' ? 'DESC' : 'ASC';
+
+    if (opts.collection) {
+      const rows = this.db
+        .prepare(
+          `SELECT i.* FROM images i
+           JOIN collection_images ci ON ci.image_id = i.id
+           WHERE ci.collection_id = ?
+           ORDER BY ${sortCol} ${dir}, i.id ASC`,
+        )
+        .all(opts.collection) as unknown as ImageRow[];
+      return rows.map(rowToMeta);
+    }
+
     const rows = this.db
-      .prepare('SELECT * FROM images ORDER BY created_at ASC, id ASC')
+      .prepare(`SELECT * FROM images ORDER BY ${sortCol} ${dir}, id ASC`)
       .all() as unknown as ImageRow[];
     return rows.map(rowToMeta);
   }
@@ -161,6 +228,83 @@ export class MetadataStore {
       total: number;
     };
     return Number(row.total);
+  }
+
+  // --- collections -------------------------------------------------------------------------------
+
+  listCollections(): Collection[] {
+    const rows = this.db
+      .prepare(
+        `SELECT c.id, c.name, c.created_at, COUNT(ci.image_id) AS image_count
+         FROM collections c
+         LEFT JOIN collection_images ci ON ci.collection_id = c.id
+         GROUP BY c.id
+         ORDER BY c.name ASC`,
+      )
+      .all() as unknown as {
+      id: string;
+      name: string;
+      created_at: string;
+      image_count: number;
+    }[];
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      createdAt: r.created_at,
+      imageCount: Number(r.image_count),
+    }));
+  }
+
+  getCollection(id: string): Collection | null {
+    const row = this.db
+      .prepare(
+        `SELECT c.id, c.name, c.created_at, COUNT(ci.image_id) AS image_count
+         FROM collections c
+         LEFT JOIN collection_images ci ON ci.collection_id = c.id
+         WHERE c.id = ?
+         GROUP BY c.id`,
+      )
+      .get(id) as { id: string; name: string; created_at: string; image_count: number } | undefined;
+    return row
+      ? {
+          id: row.id,
+          name: row.name,
+          createdAt: row.created_at,
+          imageCount: Number(row.image_count),
+        }
+      : null;
+  }
+
+  createCollection(id: string, name: string, createdAt: string): void {
+    this.db
+      .prepare('INSERT INTO collections (id, name, created_at) VALUES (:id, :name, :created_at)')
+      .run({ id, name, created_at: createdAt });
+  }
+
+  renameCollection(id: string, name: string): boolean {
+    const info = this.db.prepare('UPDATE collections SET name = ? WHERE id = ?').run(name, id);
+    return Number(info.changes) > 0;
+  }
+
+  deleteCollection(id: string): boolean {
+    const info = this.db.prepare('DELETE FROM collections WHERE id = ?').run(id);
+    return Number(info.changes) > 0;
+  }
+
+  /** Add an image to a collection. Returns false if either doesn't exist. Idempotent. */
+  addImageToCollection(collectionId: string, imageId: string): boolean {
+    if (!this.getCollection(collectionId) || !this.get(imageId)) return false;
+    this.db
+      .prepare('INSERT OR IGNORE INTO collection_images (collection_id, image_id) VALUES (?, ?)')
+      .run(collectionId, imageId);
+    return true;
+  }
+
+  removeImageFromCollection(collectionId: string, imageId: string): boolean {
+    const info = this.db
+      .prepare('DELETE FROM collection_images WHERE collection_id = ? AND image_id = ?')
+      .run(collectionId, imageId);
+    return Number(info.changes) > 0;
   }
 
   close(): void {

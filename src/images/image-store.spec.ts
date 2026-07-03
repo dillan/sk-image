@@ -313,3 +313,62 @@ describe('ImageStore serving + cache', () => {
     expect(stats.bytes).toBeLessThanOrEqual(budget + variantBytes * 2);
   });
 });
+
+describe('ImageStore — EXIF, sort, collections (M2)', () => {
+  test('ingest extracts EXIF and getExif returns the raw tags', async () => {
+    const { store } = freshStore();
+    const jpeg = await sharp({
+      create: { width: 40, height: 30, channels: 3, background: { r: 1, g: 2, b: 3 } },
+    })
+      .withExif({ IFD0: { Make: 'TestCam', Model: 'X100' } })
+      .jpeg()
+      .toBuffer();
+    const meta = await store.ingest(jpeg, 'photo.jpg');
+    expect(meta.cameraMake).toBe('TestCam');
+    expect(meta.cameraModel).toBe('X100');
+    const raw = (await store.getExif(meta.id)) as Record<string, unknown> | null;
+    expect(raw).not.toBeNull();
+    expect((raw as Record<string, unknown>).Make).toBe('TestCam');
+  });
+
+  test('list sorts by name ascending/descending', async () => {
+    const { store } = freshStore();
+    await store.ingest(await png(), 'bravo.png');
+    await store.ingest(await png(), 'alpha.png');
+    expect((await store.list({ sort: 'name', order: 'asc' })).map((m) => m.name)).toEqual([
+      'alpha.png',
+      'bravo.png',
+    ]);
+    expect((await store.list({ sort: 'name', order: 'desc' })).map((m) => m.name)).toEqual([
+      'bravo.png',
+      'alpha.png',
+    ]);
+  });
+
+  test('collections: create, add, filter, remove, rename, delete', async () => {
+    const { store } = freshStore();
+    const img = await store.ingest(await png(), 'a.png');
+    const col = store.createCollection('Deck plans');
+    expect(col.name).toBe('Deck plans');
+    expect(store.listCollections().map((c) => c.id)).toContain(col.id);
+
+    expect(store.addImageToCollection(col.id, img.id)).toBe(true);
+    expect((await store.list({ collection: col.id })).map((m) => m.id)).toEqual([img.id]);
+    expect(store.getCollection(col.id)?.imageCount).toBe(1);
+
+    expect(store.removeImageFromCollection(col.id, img.id)).toBe(true);
+    expect((await store.list({ collection: col.id })).length).toBe(0);
+
+    expect(store.renameCollection(col.id, 'Deck')).toBe(true);
+    expect(store.getCollection(col.id)?.name).toBe('Deck');
+    expect(store.deleteCollection(col.id)).toBe(true);
+    expect(store.getCollection(col.id)).toBeNull();
+  });
+
+  test('rejects malformed ids in collection ops', async () => {
+    const { store } = freshStore();
+    expect(store.getCollection('../x')).toBeNull();
+    expect(store.addImageToCollection('../x', 'y')).toBe(false);
+    expect(store.deleteCollection('..')).toBe(false);
+  });
+});

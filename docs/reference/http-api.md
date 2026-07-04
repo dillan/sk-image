@@ -1,6 +1,6 @@
 # HTTP API
 
-All routes are served by the Signal K server under `/plugins/sk-image`. When server security is enabled, the mutating routes (upload, delete, cache purge) require an authenticated request; read routes are available to any client that can read data.
+All routes are served by the Signal K server under `/plugins/sk-image`. When server security is enabled, the mutating routes (upload, delete, cache purge, collection edits) require **write access** — a read-write or admin principal; an authenticated read-only principal is rejected. Read routes are available to any client that can read Signal K data.
 
 ## `GET /config`
 
@@ -19,7 +19,7 @@ Capabilities discovery. Clients read this instead of hard-coding limits.
 
 ## `POST /images`
 
-Upload an image. `multipart/form-data` with a single `file` field. **Login required.**
+Upload an image. `multipart/form-data` with a single `file` field. **Write access required.**
 
 - The type is detected from content (magic bytes), not the filename or MIME type.
 - Returns `201` with the stored metadata (`id`, `name`, `format`, `width`, `height`, `bytes`, `animated`, `createdAt`) plus a relative `url`.
@@ -45,7 +45,7 @@ The full raw EXIF tag set for one image (or `null` when none was captured). `404
 
 ## `DELETE /images/:id`
 
-Delete an image — original bytes, metadata, and cached variants. **Login required.** `404` if the id doesn't exist.
+Delete an image — original bytes, metadata, and cached variants. **Write access required.** `404` if the id doesn't exist.
 
 ## `GET /images/cache`
 
@@ -53,11 +53,11 @@ Report the generated-variant cache: `{ "bytes": <number>, "files": <number> }`.
 
 ## `DELETE /images/cache`
 
-Purge generated variants (originals are kept and regenerate on demand). **Login required.**
+Purge generated variants (originals are kept and regenerate on demand). **Write access required.**
 
 ## Collections
 
-Group images into named collections (an image can be in many). All mutations require login.
+Group images into named collections (an image can be in many). All mutations require write access (read-write or admin).
 
 | Method | Path | Purpose |
 | --- | --- | --- |

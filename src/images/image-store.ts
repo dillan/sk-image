@@ -37,7 +37,7 @@ const MAX_HEIC_PIXELS = 24_000_000;
 export const MAX_IMAGE_COUNT = 500;
 export const MAX_TOTAL_ORIGINAL_BYTES = 500 * 1024 * 1024; // 500 MB of stored originals
 // Default disk budget for generated (resized/re-encoded) variants. LRU-evicted when exceeded.
-export const DEFAULT_MAX_CACHE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GiB
+export const DEFAULT_MAX_CACHE_BYTES = 1 * 1024 * 1024 * 1024; // 1 GiB
 
 export type ImageFormat = 'svg' | 'jpeg' | 'png' | 'webp' | 'gif' | 'heic';
 

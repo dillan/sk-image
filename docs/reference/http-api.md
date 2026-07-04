@@ -13,7 +13,7 @@ Capabilities discovery. Clients read this instead of hard-coding limits.
   "maxUploadBytes": 10485760,
   "maxImageCount": 500,
   "maxTotalOriginalBytes": 524288000,
-  "maxCacheBytes": 5368709120
+  "maxCacheBytes": 1073741824
 }
 ```
 

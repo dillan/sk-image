@@ -94,7 +94,7 @@ Raster images are never served raw. On request they're re-encoded to WebP at a w
 - When the total size would exceed the configured `maxCacheBytes` budget, it **evicts the oldest** (least-recently-used) entries until it's back under budget.
 - A **purge** clears variants only — it empties `cache/` and drops the cache's bookkeeping. Originals and `metadata.db` are untouched; purged variants regenerate on the next request.
 
-The budget is the single plugin option, "Max resized-image cache size" (default 5 GiB). Eviction and purge are both non-destructive: they only ever remove files that regenerate on demand. See [Configuration](../reference/configuration.md) for the option and its bounds, and [Request flows](request-flows.md) for how a serve request threads validation, the cache, and the sharp worker pool.
+The budget is the single plugin option, "Max resized-image cache size" (default 1 GiB). Eviction and purge are both non-destructive: they only ever remove files that regenerate on demand. See [Configuration](../reference/configuration.md) for the option and its bounds, and [Request flows](request-flows.md) for how a serve request threads validation, the cache, and the sharp worker pool.
 
 ---
 

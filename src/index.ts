@@ -62,7 +62,7 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
           type: 'number',
           title: 'Max resized-image cache size (bytes)',
           description:
-            'Disk budget for generated (resized / re-encoded) image variants. Original uploads are not counted. Default 5 GiB.',
+            'Disk budget for generated (resized / re-encoded) image variants. Original uploads are not counted. Default 1 GiB.',
           default: DEFAULT_MAX_CACHE_BYTES,
           minimum: 100 * 1024 * 1024,
         },

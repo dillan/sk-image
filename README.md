@@ -17,7 +17,7 @@ SK Image is a Signal K server plugin that stores and serves images for your vess
 ## What you'll need
 
 - A Signal K server, version 2 or newer, running on **Node.js 24 or newer** (required by the plugin's built-in SQLite).
-- Enough disk for your originals plus the resize cache (the cache size is configurable; default 5 GiB).
+- Enough disk for your originals plus the resize cache (the cache size is configurable; default 1 GiB).
 
 ## Install
 
@@ -54,7 +54,7 @@ See [`docs/reference/http-api.md`](docs/reference/http-api.md) for details.
 
 The only setting is the resize-cache budget, edited on the plugin's config screen:
 
-- **Max resized-image cache size** — disk budget for generated variants (default **5 GiB**). Originals are not counted against it.
+- **Max resized-image cache size** — disk budget for generated variants (default **1 GiB**). Originals are not counted against it.
 
 See [`docs/reference/configuration.md`](docs/reference/configuration.md).
 

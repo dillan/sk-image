@@ -6,7 +6,7 @@ SK Image is configured from its plugin config screen in the Signal K admin UI.
 
 The disk budget for generated (resized / re-encoded) image variants. Originals are **not** counted against this budget.
 
-- Default: **5 GiB** (`5368709120` bytes).
+- Default: **1 GiB** (`1073741824` bytes).
 - Minimum: 100 MiB.
 
 When the cache would exceed this size, the least-recently-used variants are evicted. Variants always regenerate on demand, so eviction never loses anything permanent.

@@ -1,0 +1,17 @@
+{
+  "name": "sk-image-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Docker + Playwright harness that captures fresh SK Image documentation screenshots.",
+  "scripts": {
+    "pretest": "playwright install chromium",
+    "seed": "node seed.mjs",
+    "screenshots": "playwright test --config=screenshots.config.ts",
+    "webp": "node scripts/to-webp.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "sharp": "^0.35.3"
+  }
+}

@@ -1,0 +1,15 @@
+name: sk-image-e2e
+
+services:
+  signalk:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+    container_name: sk-image-signalk
+    # The base image's startup.sh forces --securityenabled; override it to run an open local server
+    # (anonymous read/write) for a turnkey screenshot stack. Do NOT expose this to a network.
+    entrypoint: ['node', '/home/node/signalk/node_modules/signalk-server/bin/signalk-server']
+    environment:
+      IS_IN_DOCKER: 'true'
+    ports:
+      - '${SIGNALK_PORT:-3000}:3000'

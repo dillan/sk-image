@@ -69,11 +69,11 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
         pool = new WorkerPoolImageProcessor();
         store = new ImageStore(dir, pool, { maxCacheBytes: configuredMaxCacheBytes });
         initFailed = false;
-        app.debug(`[sk-image] store ready at ${dir} (workers=${pool.size})`);
+        app.debug(`store ready at ${dir} (workers=${pool.size})`);
       } catch (e) {
         const detail = (e as Error).message;
         initFailed = true;
-        app.error(`[sk-image] failed to initialize image store: ${detail}`);
+        app.error(`failed to initialize image store: ${detail}`);
         app.setPluginError(`Image store unavailable: ${detail}`);
         raiseStoreUnavailable(app, detail);
         // Tear down the just-spawned worker pool so its threads don't leak on a failed init.

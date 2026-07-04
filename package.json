@@ -23,6 +23,7 @@
   "files": [
     "dist",
     "public",
+    "docs/images",
     "README.md",
     "LICENSE"
   ],
@@ -36,7 +37,12 @@
   "homepage": "https://github.com/dillan/sk-image#readme",
   "signalk": {
     "displayName": "SK Image",
-    "appIcon": "icon.svg"
+    "appIcon": "icon.svg",
+    "screenshots": [
+      "docs/images/library.webp",
+      "docs/images/collections.webp",
+      "docs/images/settings.webp"
+    ]
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

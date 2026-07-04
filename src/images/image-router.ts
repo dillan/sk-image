@@ -76,7 +76,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
           return sendJson(res, 201, { ...meta, url: `images/${meta.id}` });
         } catch (e) {
           if (e instanceof ImageValidationError) return sendError(res, 415, e.message);
-          deps.log?.(`[sk-image] ingest error: ${(e as Error).message}`);
+          deps.log?.(`ingest error: ${(e as Error).message}`);
           return sendError(res, 500, 'Failed to store image');
         }
       })();
@@ -143,7 +143,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
         for (const [k, v] of Object.entries(servable.headers)) res.setHeader(k, v);
         res.status(200).send(servable.buffer);
       } catch (e) {
-        deps.log?.(`[sk-image] serve error: ${(e as Error).message}`);
+        deps.log?.(`serve error: ${(e as Error).message}`);
         sendError(res, 500, 'Failed to render image');
       }
     })();

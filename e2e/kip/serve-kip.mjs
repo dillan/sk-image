@@ -60,8 +60,9 @@ const server = createServer(async (req, res) => {
     });
     res.end(body);
   } catch (e) {
+    console.error(e); // log for debugging; never return error/stack detail to the client
     res.writeHead(500);
-    res.end(String(e));
+    res.end('internal server error');
   }
 });
 

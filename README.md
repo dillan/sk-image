@@ -16,7 +16,7 @@ SK Image is a Signal K server plugin that stores and serves images for your vess
 
 ## What you'll need
 
-- A Signal K server, version 2 or newer, running on **Node.js 24 or newer** (required by the plugin's built-in SQLite).
+- A Signal K server, version 2 or newer, running on **Node.js 24 or newer** — required by the plugin's built-in SQLite (`node:sqlite`). Devices still on Node.js 20 (including the **Victron Cerbo GX / Venus OS**) can't run it yet.
 - Enough disk for your originals plus the resize cache (the cache size is configurable; default 1 GiB).
 
 ## Install

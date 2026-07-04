@@ -16,7 +16,7 @@ Installing pulls the package from npm, so the server needs internet access on fi
 
 ### It won't start, or asks for a newer Node
 
-SK Image needs **Node 24 or newer** because it uses Node's built-in SQLite. Run `node -v`; if it is below 24, upgrade Node on the server and restart Signal K.
+SK Image needs **Node 24 or newer** because it uses Node's built-in SQLite. Run `node -v`; if it is below 24, upgrade Node on the server and restart Signal K. Some appliances lag behind on Node — notably the **Victron Cerbo GX / Venus OS**, which ships Node 20 — and can't run SK Image until they update to Node 24.
 
 ---
 

@@ -33,7 +33,7 @@ List the library — an array of image metadata. Optional query parameters:
 - `order` — `asc` or `desc`. Default: `asc`.
 - `collection` — a collection id to list only that collection's images.
 
-Each item includes EXIF-derived fields when present: `captureDate`, `lat`, `lon`, `cameraMake`, `cameraModel`, `orientation`.
+Each item includes EXIF-derived fields when present: `captureDate`, `lat`, `lon`, `cameraMake`, `cameraModel`, `orientation`. On a secured server, capture GPS (`lat`/`lon`) is omitted for anonymous/read-only clients — only logged-in users see it. (On an unsecured server everything is returned.)
 
 ## `GET /images/:id?w=<width>`
 
@@ -41,7 +41,7 @@ Serve an image. Raster images are re-encoded to WebP and resized to the nearest 
 
 ## `GET /images/:id/exif`
 
-The full raw EXIF tag set for one image (or `null` when none was captured). `404` for an unknown id.
+The full raw EXIF tag set for one image (or `null` when none was captured). Because raw EXIF can contain capture GPS, on a secured server this **requires a logged-in user** — an anonymous request gets `401`. `404` for an unknown id.
 
 ## `DELETE /images/:id`
 

@@ -112,8 +112,24 @@ export const api = {
     return req<ImageAsset[]>(`/images${qs ? `?${qs}` : ''}`);
   },
 
-  exif: (id: string) =>
-    req<Record<string, unknown> | null>(`/images/${encodeURIComponent(id)}/exif`),
+  // EXIF may require login on a secured server; treat "not allowed" as "no EXIF" so an anonymous
+  // viewer just doesn't see details rather than being bounced to the login page.
+  exif: async (id: string): Promise<Record<string, unknown> | null> => {
+    const res = await fetch(`${BASE}/images/${encodeURIComponent(id)}/exif`, {
+      credentials: 'include',
+    });
+    if (res.status === 401 || res.status === 403) return null;
+    if (!res.ok) {
+      let message = res.statusText;
+      try {
+        message = ((await res.json()) as { error?: string }).error ?? message;
+      } catch {
+        /* non-JSON error body */
+      }
+      throw new Error(message);
+    }
+    return (await res.json()) as Record<string, unknown> | null;
+  },
   upload: uploadWithProgress,
   remove: (id: string) =>
     req<{ ok: boolean }>(`/images/${encodeURIComponent(id)}`, { method: 'DELETE' }),

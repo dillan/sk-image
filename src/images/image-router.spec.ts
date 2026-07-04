@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import type { IRouter } from 'express';
 import { ImageStore } from './image-store';
 import { registerImageRoutes } from './image-router';
-import { isAuthorizedWriter } from './sk-request';
+import { isAuthorizedWriter, canReadSensitiveMetadata } from './sk-request';
 
 type Handler = (req: unknown, res: unknown) => void;
 
@@ -136,9 +136,9 @@ test('isAuthorizedWriter: an anonymous readonly principal (Allow Readonly Access
   expect(isAuthorizedWriter(ro)).toBe(false);
 });
 
-test('reads stay open by design: list and EXIF are served without a principal', async () => {
-  // The library is meant to be shared across the boat; read routes carry no auth gate. This pins
-  // that decision so a future change can't silently start requiring login to view images.
+test('reads stay open on an unsecured server: list and EXIF need no principal', async () => {
+  // With no security strategy (both signals unset) the boat is unsecured, so everything is readable
+  // — pinned so a future change can't silently start requiring login to view images on such a setup.
   const { store, router } = setup();
   const meta = await store.ingest(await png(), 'm.png');
 
@@ -181,6 +181,92 @@ test('denied writes: 403 for a logged-in read-only user, 401 for anonymous/AUTO'
   );
   await auto.done;
   expect(auto.statusCode).toBe(401);
+});
+
+test('canReadSensitiveMetadata: open when unsecured or logged in; blocked for secured anon/AUTO', () => {
+  expect(canReadSensitiveMetadata(asReq({}))).toBe(true); // no security strategy
+  expect(
+    canReadSensitiveMetadata(
+      asReq({
+        skPrincipal: { identifier: 'u1', permissions: 'readonly' },
+        skIsAuthenticated: true,
+      }),
+    ),
+  ).toBe(true);
+  expect(canReadSensitiveMetadata(asReq({ skIsAuthenticated: false }))).toBe(false); // secured anon
+  expect(
+    canReadSensitiveMetadata(
+      asReq({
+        skPrincipal: { identifier: 'AUTO', permissions: 'readonly' },
+        skIsAuthenticated: true,
+      }),
+    ),
+  ).toBe(false);
+});
+
+test('GET /images hides capture GPS from a secured anonymous client but keeps it for a logged-in user', async () => {
+  const stub = {
+    list: async () => [
+      {
+        id: 'a',
+        name: 'a.jpg',
+        format: 'jpeg',
+        width: 1,
+        height: 1,
+        bytes: 1,
+        animated: false,
+        createdAt: 't',
+        lat: 12.3,
+        lon: 45.6,
+      },
+    ],
+  };
+  const router = createRouterMock();
+  registerImageRoutes(router as unknown as IRouter, {
+    resolveStore: () => stub as unknown as ImageStore,
+  });
+
+  const anon = createResMock();
+  router.getHandlers.get('/images')!({ skIsAuthenticated: false }, anon);
+  await anon.done;
+  const anonItems = anon.jsonBody as { lat: number | null; lon: number | null }[];
+  expect(anonItems[0].lat).toBeNull();
+  expect(anonItems[0].lon).toBeNull();
+
+  const user = createResMock();
+  router.getHandlers.get('/images')!(
+    { skPrincipal: { identifier: 'u1', permissions: 'readonly' }, skIsAuthenticated: true },
+    user,
+  );
+  await user.done;
+  const userItems = user.jsonBody as { lat: number | null; lon: number | null }[];
+  expect(userItems[0].lat).toBe(12.3);
+  expect(userItems[0].lon).toBe(45.6);
+});
+
+test('GET /images/:id/exif requires a logged-in user on a secured server', async () => {
+  const { store, router } = setup();
+  const meta = await store.ingest(await png(), 'm.png');
+
+  const anon = createResMock();
+  router.getHandlers.get('/images/:id/exif')!(
+    { skIsAuthenticated: false, params: { id: meta.id } },
+    anon,
+  );
+  await anon.done;
+  expect(anon.statusCode).toBe(401);
+
+  const user = createResMock();
+  router.getHandlers.get('/images/:id/exif')!(
+    {
+      skPrincipal: { identifier: 'u1', permissions: 'readonly' },
+      skIsAuthenticated: true,
+      params: { id: meta.id },
+    },
+    user,
+  );
+  await user.done;
+  expect(user.statusCode).toBe(200);
 });
 
 test('POST /images rejects an anonymous (not-logged-in) request with 401', async () => {

@@ -28,6 +28,17 @@ export function isAuthenticatedUser(req: SkRequest): boolean {
 }
 
 /**
+ * True when the request may read sensitive per-image metadata — capture GPS coordinates and raw
+ * EXIF. Open on an unsecured server (no security strategy at all) and to any logged-in user; a
+ * secured server's anonymous or read-only `AUTO` visitor is excluded, so a shared library doesn't
+ * leak where photos were taken to the public.
+ */
+export function canReadSensitiveMetadata(req: SkRequest): boolean {
+  if (req.skPrincipal === undefined && req.skIsAuthenticated === undefined) return true;
+  return isAuthenticatedUser(req);
+}
+
+/**
  * True when the request may perform a write (upload / delete / mutate collections).
  *
  * Signal K mounts plugin routers without auth middleware, so this is the only write gate on the

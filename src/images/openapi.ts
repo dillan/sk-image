@@ -124,7 +124,8 @@ export function imageOpenApi(): object {
       },
       '/images': {
         get: {
-          summary: 'List the image library.',
+          summary:
+            'List the image library (capture GPS omitted for anonymous clients on a secured server).',
           parameters: [
             { name: 'sort', in: 'query', schema: { type: 'string', enum: ['name', 'date'] } },
             { name: 'order', in: 'query', schema: { type: 'string', enum: ['asc', 'desc'] } },
@@ -193,10 +194,12 @@ export function imageOpenApi(): object {
       },
       '/images/{id}/exif': {
         get: {
-          summary: 'Full raw EXIF for one image (null when none was captured).',
+          summary:
+            'Full raw EXIF for one image (login required on a secured server; may contain GPS).',
           parameters: [idParam('id')],
           responses: {
             '200': { description: 'Raw EXIF, or null', content: { 'application/json': {} } },
+            '401': errorResponse('Login required to view EXIF (secured server, anonymous request)'),
             '404': errorResponse('Image not found'),
           },
         },

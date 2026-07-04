@@ -1,7 +1,13 @@
 import type { IRouter, Request, Response } from 'express';
 import multer from 'multer';
 import { ImageStore, ImageValidationError, MAX_UPLOAD_BYTES } from './image-store';
-import { type SkRequest, isAuthorizedWriter, isAuthenticatedUser, principalId } from './sk-request';
+import {
+  type SkRequest,
+  isAuthorizedWriter,
+  isAuthenticatedUser,
+  canReadSensitiveMetadata,
+  principalId,
+} from './sk-request';
 
 const ID_RE = /^[A-Za-z0-9-]+$/;
 
@@ -10,6 +16,11 @@ function sendJson(res: Response, status: number, body: unknown): void {
 }
 function sendError(res: Response, status: number, message: string): void {
   res.status(status).json({ error: message });
+}
+
+/** Remove capture GPS from image metadata for clients not allowed to see the location. */
+function stripLocation<T extends { lat?: number | null; lon?: number | null }>(meta: T): T {
+  return { ...meta, lat: null, lon: null };
 }
 
 /** Normalize a client-supplied collection name (trim, strip control chars, cap length). */
@@ -106,7 +117,9 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
     const collection = collectionRaw && ID_RE.test(collectionRaw) ? collectionRaw : undefined;
     void (async () => {
       try {
-        res.json(await store.list({ sort, order, collection }));
+        const items = await store.list({ sort, order, collection });
+        // Capture GPS is only shown to logged-in users (open on an unsecured server).
+        res.json(canReadSensitiveMetadata(req as SkRequest) ? items : items.map(stripLocation));
       } catch {
         sendError(res, 500, 'Failed to list images');
       }
@@ -181,6 +194,10 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // GET /images/:id/exif — full raw EXIF for one image (null when none was captured).
   router.get('/images/:id/exif', (req: Request, res: Response) => {
+    // Raw EXIF can carry capture GPS; only logged-in users may read it (open on an unsecured server).
+    if (!canReadSensitiveMetadata(req as SkRequest)) {
+      return sendError(res, 401, 'Login required to view image EXIF');
+    }
     const id = String(req.params.id ?? '');
     if (!ID_RE.test(id)) return sendError(res, 400, 'Invalid image id');
     const store = getStore(res);

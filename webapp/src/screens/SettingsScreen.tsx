@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
-import type { CacheStats } from '../api';
+import type { CacheStats, PluginConfig } from '../api';
 import { formatBytes } from '../lib/format';
 
-export function SettingsScreen() {
+export function SettingsScreen({ config }: { config: PluginConfig | null }) {
   const [stats, setStats] = useState<CacheStats | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -47,6 +47,8 @@ export function SettingsScreen() {
         <dl className="kv">
           <dt>Cache size</dt>
           <dd>{stats ? formatBytes(stats.bytes) : '—'}</dd>
+          <dt>Cache budget</dt>
+          <dd>{config ? formatBytes(config.maxCacheBytes) : '—'}</dd>
           <dt>Cached files</dt>
           <dd>{stats ? stats.files : '—'}</dd>
         </dl>

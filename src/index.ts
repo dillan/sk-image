@@ -24,6 +24,9 @@ import { imageOpenApi } from './images/openapi';
 
 const SUPPORTED_FORMATS: readonly ImageFormat[] = ['svg', 'jpeg', 'png', 'webp', 'gif', 'heic'];
 
+const MiB = 1024 * 1024;
+const GiB = 1024 * MiB;
+
 /** Human-readable binary size for the plugin status line (e.g. "1.0 GiB"). */
 function fmtBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -95,12 +98,19 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
       properties: {
         maxCacheBytes: {
           type: 'number',
-          title: 'Max resized-image cache size (bytes)',
+          title: 'Max resized-image cache size',
           description:
-            'Disk budget for generated (resized / re-encoded) image variants. Original uploads are not counted. Default 1 GiB.',
+            'Disk budget for generated (resized / re-encoded) image variants. Original uploads are not counted.',
+          enum: [512 * MiB, 1 * GiB, 2 * GiB, 4 * GiB, 8 * GiB],
+          enumNames: ['512 MiB', '1 GiB (default)', '2 GiB', '4 GiB', '8 GiB'],
           default: DEFAULT_MAX_CACHE_BYTES,
-          minimum: 100 * 1024 * 1024,
         },
+      },
+    }),
+    uiSchema: () => ({
+      maxCacheBytes: {
+        'ui:help':
+          'Generated image variants only — your original uploads are never counted against this budget.',
       },
     }),
     start: (settings) => {

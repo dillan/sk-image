@@ -80,7 +80,7 @@ export function App() {
         {cluster === 'collections' && (
           <CollectionsScreen collections={collections} onChange={refreshCollections} />
         )}
-        {cluster === 'settings' && <SettingsScreen />}
+        {cluster === 'settings' && <SettingsScreen config={config} />}
       </div>
 
       <nav className="tabbar" aria-label="Primary">

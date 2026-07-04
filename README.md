@@ -6,6 +6,8 @@
 
 SK Image is a Signal K server plugin that stores and serves images for your vessel — logos, cabin diagrams, deck plans, safety cards, reference photos. It validates uploads, re-encodes and resizes them to WebP on demand, keeps a size-capped disk cache, and exposes a small REST API. It ships its own web-app image library — browse, upload, view EXIF, and organize into collections — served at `/sk-image`, and is also built to back the KIP **Image** widget.
 
+**Documentation:** start with [Getting started](docs/guides/getting-started.md), or browse the [full docs](docs/README.md) — boater guides, the HTTP API reference, and developer docs with architecture and sequence diagrams.
+
 ## Why you need it
 
 - **One shared library.** Upload once; every dashboard and device on the boat can display it.
@@ -14,8 +16,8 @@ SK Image is a Signal K server plugin that stores and serves images for your vess
 
 ## What you'll need
 
-- A Signal K server, version 2 or newer, running on **Node.js 24 or newer** (required by the plugin's built-in SQLite).
-- Enough disk for your originals plus the resize cache (the cache size is configurable; default 5 GiB).
+- A Signal K server, version 2 or newer, running on **Node.js 24 or newer** — required by the plugin's built-in SQLite (`node:sqlite`). Devices still on Node.js 20 (including the **Victron Cerbo GX / Venus OS**) can't run it yet.
+- Enough disk for your originals plus the resize cache (the cache size is configurable; default 1 GiB).
 
 ## Install
 
@@ -52,7 +54,7 @@ See [`docs/reference/http-api.md`](docs/reference/http-api.md) for details.
 
 The only setting is the resize-cache budget, edited on the plugin's config screen:
 
-- **Max resized-image cache size** — disk budget for generated variants (default **5 GiB**). Originals are not counted against it.
+- **Max resized-image cache size** — disk budget for generated variants (default **1 GiB**). Originals are not counted against it.
 
 See [`docs/reference/configuration.md`](docs/reference/configuration.md).
 
@@ -74,6 +76,15 @@ npm run format     # prettier --write
 ```
 
 Source lives in `src/` and compiles to `dist/` (the published entry is `dist/index.js`). Image bytes are stored on disk under the plugin's data dir; metadata lives in an SQLite database beside them. See [`AGENTS.md`](AGENTS.md) for a source-tree map and the security invariants.
+
+The developer docs go deeper, with diagrams:
+
+- [Architecture overview](docs/developers/architecture.md) — the component map and where each concern lives.
+- [Request flows](docs/developers/request-flows.md) — upload and serve-with-cache as sequence diagrams.
+- [Storage & data model](docs/developers/storage-and-data.md) — disk layout, the SQLite schema, and the variant cache.
+- [Security model](docs/developers/security-model.md) — the invariants every change must keep.
+- [Widget auto-install](docs/developers/auto-install.md) — how KIP installs and enables the plugin.
+- [Screenshots](docs/developers/screenshots.md) — the Docker + Playwright pipeline that refreshes the docs' images.
 
 ### Run your changes against a Signal K server
 

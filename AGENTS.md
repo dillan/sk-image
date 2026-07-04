@@ -42,4 +42,4 @@ npm run format         # prettier --write .
 - Raster originals are **never** served raw — always re-encoded to WebP on the way out.
 - SVGs are **sanitized** (DOMPurify) on ingest; scripts/event handlers/external refs are stripped.
 - On-disk names are generated UUIDs; the client filename is stored only as display metadata, never used to build a path.
-- Upload / delete / cache-purge require an authenticated principal when server security is on.
+- Upload / delete / cache-purge require **read-write or admin permission** (via `isAuthorizedWriter` in `src/images/sk-request.ts`) when server security is on — an authenticated read-only principal is rejected. Plugin routes have no server-side auth middleware, so this in-handler check is the only write gate.

@@ -46,5 +46,14 @@ jobs:
       - run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
   # Packs the plugin and loads it into a real Signal K server to verify it installs + registers.
+  # The desktop matrix is pinned to Node 24: the plugin uses the built-in `node:sqlite`, which is
+  # only un-flagged from Node 24, so it can't run on Node 20/22.
+  #
+  # The armv7 (Cerbo GX) job is left ENABLED on purpose. It runs on Node 20 (Venus OS's version) and
+  # is expected to fail today — but it is an advisory, non-blocking check (continue-on-error), so its
+  # red status is an honest signal that the plugin won't run on a Cerbo GX until Venus OS ships
+  # Node 24. Do not silence it by disabling armv7.
   signalk-integration:
     uses: SignalK/signalk-server/.github/workflows/plugin-ci.yml@master
+    with:
+      node-versions: '["24"]'

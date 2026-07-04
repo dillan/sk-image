@@ -1,6 +1,6 @@
 # HTTP API
 
-All routes are served by the Signal K server under `/plugins/sk-image`. When server security is enabled, the mutating routes (upload, delete, cache purge) require an authenticated request; read routes are available to any client that can read data.
+All routes are served by the Signal K server under `/plugins/sk-image`. When server security is enabled, the mutating routes (upload, delete, cache purge, collection edits) require **write access** — a read-write or admin principal. A denied write returns `401` for an anonymous request (log in) or `403` for a logged-in read-only account (your account lacks write access). Read routes are available to any client that can read Signal K data.
 
 ## `GET /config`
 
@@ -13,17 +13,17 @@ Capabilities discovery. Clients read this instead of hard-coding limits.
   "maxUploadBytes": 10485760,
   "maxImageCount": 500,
   "maxTotalOriginalBytes": 524288000,
-  "maxCacheBytes": 5368709120
+  "maxCacheBytes": 1073741824
 }
 ```
 
 ## `POST /images`
 
-Upload an image. `multipart/form-data` with a single `file` field. **Login required.**
+Upload an image. `multipart/form-data` with a single `file` field. **Write access required.**
 
 - The type is detected from content (magic bytes), not the filename or MIME type.
 - Returns `201` with the stored metadata (`id`, `name`, `format`, `width`, `height`, `bytes`, `animated`, `createdAt`) plus a relative `url`.
-- Errors: `401` (not logged in), `413` (over the size limit), `415` (unsupported / unsafe content).
+- Errors: `401` (not logged in), `403` (logged in without write access), `413` (over the size limit), `415` (unsupported / unsafe content).
 
 ## `GET /images`
 
@@ -33,7 +33,7 @@ List the library — an array of image metadata. Optional query parameters:
 - `order` — `asc` or `desc`. Default: `asc`.
 - `collection` — a collection id to list only that collection's images.
 
-Each item includes EXIF-derived fields when present: `captureDate`, `lat`, `lon`, `cameraMake`, `cameraModel`, `orientation`.
+Each item includes EXIF-derived fields when present: `captureDate`, `lat`, `lon`, `cameraMake`, `cameraModel`, `orientation`. On a secured server, capture GPS (`lat`/`lon`) is omitted for anonymous/read-only clients — only logged-in users see it. (On an unsecured server everything is returned.)
 
 ## `GET /images/:id?w=<width>`
 
@@ -41,11 +41,11 @@ Serve an image. Raster images are re-encoded to WebP and resized to the nearest 
 
 ## `GET /images/:id/exif`
 
-The full raw EXIF tag set for one image (or `null` when none was captured). `404` for an unknown id.
+The full raw EXIF tag set for one image (or `null` when none was captured). Because raw EXIF can contain capture GPS, on a secured server this **requires a logged-in user** — an anonymous request gets `401`. `404` for an unknown id.
 
 ## `DELETE /images/:id`
 
-Delete an image — original bytes, metadata, and cached variants. **Login required.** `404` if the id doesn't exist.
+Delete an image — original bytes, metadata, and cached variants. **Write access required.** `404` if the id doesn't exist.
 
 ## `GET /images/cache`
 
@@ -53,11 +53,11 @@ Report the generated-variant cache: `{ "bytes": <number>, "files": <number> }`.
 
 ## `DELETE /images/cache`
 
-Purge generated variants (originals are kept and regenerate on demand). **Login required.**
+Purge generated variants (originals are kept and regenerate on demand). **Write access required.**
 
 ## Collections
 
-Group images into named collections (an image can be in many). All mutations require login.
+Group images into named collections (an image can be in many). All mutations require write access (read-write or admin).
 
 | Method | Path | Purpose |
 | --- | --- | --- |

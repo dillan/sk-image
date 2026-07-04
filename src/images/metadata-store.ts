@@ -120,20 +120,27 @@ export class MetadataStore {
    * every route with a 503.
    */
   private static open(dbPath: string): DatabaseSync {
+    let db: DatabaseSync | undefined;
     try {
-      const db = new DatabaseSync(dbPath);
+      db = new DatabaseSync(dbPath);
       db.exec(SCHEMA); // forces a header read; throws ERR_SQLITE_ERROR on a corrupt file
       return db;
     } catch (e) {
       if ((e as { code?: string }).code !== 'ERR_SQLITE_ERROR') throw e;
+      // Release the handle on the bad file first — Windows won't move a file that's still open.
+      try {
+        db?.close();
+      } catch {
+        // ignore — the file may not have opened at all
+      }
       try {
         renameSync(dbPath, `${dbPath}.corrupt-${Date.now()}`);
       } catch {
         // best effort — if we can't move it, the retry below surfaces the real error
       }
-      const db = new DatabaseSync(dbPath);
-      db.exec(SCHEMA);
-      return db;
+      const fresh = new DatabaseSync(dbPath);
+      fresh.exec(SCHEMA);
+      return fresh;
     }
   }
 

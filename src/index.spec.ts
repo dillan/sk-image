@@ -49,6 +49,8 @@ function createAppMock(dataDir: string): ServerAPI {
     debug: () => {},
     error: () => {},
     setPluginStatus: () => {},
+    setPluginError: () => {},
+    notifications: { raise: () => 'id' },
   } as unknown as ServerAPI;
 }
 
@@ -64,7 +66,7 @@ test('plugin factory exposes the Signal K plugin contract', () => {
   expect(typeof plugin.registerWithRouter).toBe('function');
 
   const schema = plugin.schema as () => { properties: { maxCacheBytes: { default: number } } };
-  expect(schema().properties.maxCacheBytes.default).toBe(5 * 1024 * 1024 * 1024);
+  expect(schema().properties.maxCacheBytes.default).toBe(1 * 1024 * 1024 * 1024);
 });
 
 test('GET /config advertises the width allow-list + limits (single source of truth for clients)', () => {
@@ -89,7 +91,13 @@ test('GET /config advertises the width allow-list + limits (single source of tru
   expect(body.maxUploadBytes).toBe(10 * 1024 * 1024);
   expect(body.maxImageCount).toBe(500);
   expect(body.maxTotalOriginalBytes).toBe(500 * 1024 * 1024);
-  expect(body.maxCacheBytes).toBe(5 * 1024 * 1024 * 1024);
+  expect(body.maxCacheBytes).toBe(1 * 1024 * 1024 * 1024);
   expect(body.supportedFormats).toContain('heic');
   expect(body.supportedFormats).toContain('svg');
+});
+
+test('statusMessage reports readiness before the store is built', () => {
+  const plugin = skImagePlugin(createAppMock(TMP));
+  expect(typeof plugin.statusMessage).toBe('function');
+  expect(plugin.statusMessage?.()).toBe('Ready');
 });

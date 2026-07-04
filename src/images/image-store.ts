@@ -37,7 +37,7 @@ const MAX_HEIC_PIXELS = 24_000_000;
 export const MAX_IMAGE_COUNT = 500;
 export const MAX_TOTAL_ORIGINAL_BYTES = 500 * 1024 * 1024; // 500 MB of stored originals
 // Default disk budget for generated (resized/re-encoded) variants. LRU-evicted when exceeded.
-export const DEFAULT_MAX_CACHE_BYTES = 5 * 1024 * 1024 * 1024; // 5 GiB
+export const DEFAULT_MAX_CACHE_BYTES = 1 * 1024 * 1024 * 1024; // 1 GiB
 
 export type ImageFormat = 'svg' | 'jpeg' | 'png' | 'webp' | 'gif' | 'heic';
 
@@ -344,6 +344,11 @@ export class ImageStore {
   /** List stored image metadata, optionally filtered to a collection and sorted. */
   async list(opts: ListImagesOptions = {}): Promise<ImageMeta[]> {
     return this.meta.list(opts);
+  }
+
+  /** Number of images in the library (synchronous — used for plugin status reporting). */
+  imageCount(): number {
+    return this.meta.count();
   }
 
   async getMeta(id: string): Promise<ImageMeta | null> {

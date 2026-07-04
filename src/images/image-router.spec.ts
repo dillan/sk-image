@@ -5,7 +5,8 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import type { IRouter } from 'express';
 import { ImageStore } from './image-store';
-import { registerImageRoutes, isAuthenticatedRequest } from './image-router';
+import { registerImageRoutes } from './image-router';
+import { isAuthorizedWriter, canReadSensitiveMetadata } from './sk-request';
 
 type Handler = (req: unknown, res: unknown) => void;
 
@@ -95,27 +96,193 @@ const png = (): Promise<Buffer> =>
     .png()
     .toBuffer();
 
+// Track every store so its SQLite handle is closed before rmSync (Windows can't remove an open file).
+const opened: ImageStore[] = [];
+function trackStore(...args: ConstructorParameters<typeof ImageStore>): ImageStore {
+  const store = new ImageStore(...args);
+  opened.push(store);
+  return store;
+}
 function setup(): { store: ImageStore; router: RouterMock } {
-  const store = new ImageStore(join(TMP_ROOT, randomUUID()));
+  const store = trackStore(join(TMP_ROOT, randomUUID()));
   const router = createRouterMock();
   registerImageRoutes(router as unknown as IRouter, { resolveStore: () => store });
   return { store, router };
 }
 
-// isAuthenticatedRequest takes an SK-augmented express Request; feed it small partials.
-type SkReq = Parameters<typeof isAuthenticatedRequest>[0];
+// isAuthorizedWriter takes an SK-augmented express Request; feed it small partials.
+type SkReq = Parameters<typeof isAuthorizedWriter>[0];
 const asReq = (r: object): SkReq => r as unknown as SkReq;
+/** A logged-in read-write principal — the shape SK attaches for an authorized writer. */
+const AUTH = { skPrincipal: { identifier: 'u1', permissions: 'readwrite' } };
 
-afterAll(() => rmSync(TMP_ROOT, { recursive: true, force: true }));
+afterAll(() => {
+  for (const s of opened) {
+    try {
+      s.close();
+    } catch {
+      /* already closed */
+    }
+  }
+  rmSync(TMP_ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+});
 
-test('isAuthenticatedRequest: open when no security, requires a principal when security is on', () => {
-  expect(isAuthenticatedRequest(asReq({}))).toBe(true);
-  expect(isAuthenticatedRequest(asReq({ skPrincipal: { identifier: 'u1' } }))).toBe(true);
-  expect(isAuthenticatedRequest(asReq({ skIsAuthenticated: true }))).toBe(true);
-  expect(isAuthenticatedRequest(asReq({ skIsAuthenticated: false }))).toBe(false);
-  expect(isAuthenticatedRequest(asReq({ skPrincipal: null, skIsAuthenticated: false }))).toBe(
-    false,
+test('isAuthorizedWriter: open only when no security; otherwise requires read-write/admin', () => {
+  expect(isAuthorizedWriter(asReq({}))).toBe(true); // no security strategy at all → open
+  expect(
+    isAuthorizedWriter(asReq({ skPrincipal: { identifier: 'u1', permissions: 'readwrite' } })),
+  ).toBe(true);
+  expect(
+    isAuthorizedWriter(asReq({ skPrincipal: { identifier: 'u1', permissions: 'admin' } })),
+  ).toBe(true);
+  // authenticated but without write permission → rejected
+  expect(isAuthorizedWriter(asReq({ skPrincipal: { identifier: 'u1' } }))).toBe(false);
+  expect(isAuthorizedWriter(asReq({ skIsAuthenticated: true }))).toBe(false);
+  expect(isAuthorizedWriter(asReq({ skIsAuthenticated: false }))).toBe(false);
+  expect(isAuthorizedWriter(asReq({ skPrincipal: null, skIsAuthenticated: false }))).toBe(false);
+});
+
+test('isAuthorizedWriter: an anonymous readonly principal (Allow Readonly Access) cannot write', () => {
+  // The SK server marks anonymous readonly visitors as authenticated with permissions:'readonly'.
+  // Writes must require read-write/admin — presence of a principal is not enough.
+  const ro = asReq({
+    skPrincipal: { identifier: 'AUTO', permissions: 'readonly' },
+    skIsAuthenticated: true,
+  });
+  expect(isAuthorizedWriter(ro)).toBe(false);
+});
+
+test('reads stay open on an unsecured server: list and EXIF need no principal', async () => {
+  // With no security strategy (both signals unset) the boat is unsecured, so everything is readable
+  // — pinned so a future change can't silently start requiring login to view images on such a setup.
+  const { store, router } = setup();
+  const meta = await store.ingest(await png(), 'm.png');
+
+  const list = createResMock();
+  router.getHandlers.get('/images')!({}, list);
+  await list.done;
+  expect(list.statusCode).toBe(200);
+
+  const exif = createResMock();
+  router.getHandlers.get('/images/:id/exif')!({ params: { id: meta.id } }, exif);
+  await exif.done;
+  expect(exif.statusCode).toBe(200);
+});
+
+test('denied writes: 403 for a logged-in read-only user, 401 for anonymous/AUTO', async () => {
+  const { router } = setup();
+
+  // A real logged-in read-only account is authenticated but not authorized → 403 (no login loop).
+  const ro = createResMock();
+  router.postHandlers.get('/collections')!(
+    {
+      skPrincipal: { identifier: 'guest', permissions: 'readonly' },
+      skIsAuthenticated: true,
+      body: { name: 'Deck' },
+    },
+    ro,
   );
+  await ro.done;
+  expect(ro.statusCode).toBe(403);
+
+  // The anonymous AUTO principal (Allow Readonly Access) should be prompted to log in → 401.
+  const auto = createResMock();
+  router.postHandlers.get('/collections')!(
+    {
+      skPrincipal: { identifier: 'AUTO', permissions: 'readonly' },
+      skIsAuthenticated: true,
+      body: { name: 'Deck' },
+    },
+    auto,
+  );
+  await auto.done;
+  expect(auto.statusCode).toBe(401);
+});
+
+test('canReadSensitiveMetadata: open when unsecured or logged in; blocked for secured anon/AUTO', () => {
+  expect(canReadSensitiveMetadata(asReq({}))).toBe(true); // no security strategy
+  expect(
+    canReadSensitiveMetadata(
+      asReq({
+        skPrincipal: { identifier: 'u1', permissions: 'readonly' },
+        skIsAuthenticated: true,
+      }),
+    ),
+  ).toBe(true);
+  expect(canReadSensitiveMetadata(asReq({ skIsAuthenticated: false }))).toBe(false); // secured anon
+  expect(
+    canReadSensitiveMetadata(
+      asReq({
+        skPrincipal: { identifier: 'AUTO', permissions: 'readonly' },
+        skIsAuthenticated: true,
+      }),
+    ),
+  ).toBe(false);
+});
+
+test('GET /images hides capture GPS from a secured anonymous client but keeps it for a logged-in user', async () => {
+  const stub = {
+    list: async () => [
+      {
+        id: 'a',
+        name: 'a.jpg',
+        format: 'jpeg',
+        width: 1,
+        height: 1,
+        bytes: 1,
+        animated: false,
+        createdAt: 't',
+        lat: 12.3,
+        lon: 45.6,
+      },
+    ],
+  };
+  const router = createRouterMock();
+  registerImageRoutes(router as unknown as IRouter, {
+    resolveStore: () => stub as unknown as ImageStore,
+  });
+
+  const anon = createResMock();
+  router.getHandlers.get('/images')!({ skIsAuthenticated: false }, anon);
+  await anon.done;
+  const anonItems = anon.jsonBody as { lat: number | null; lon: number | null }[];
+  expect(anonItems[0].lat).toBeNull();
+  expect(anonItems[0].lon).toBeNull();
+
+  const user = createResMock();
+  router.getHandlers.get('/images')!(
+    { skPrincipal: { identifier: 'u1', permissions: 'readonly' }, skIsAuthenticated: true },
+    user,
+  );
+  await user.done;
+  const userItems = user.jsonBody as { lat: number | null; lon: number | null }[];
+  expect(userItems[0].lat).toBe(12.3);
+  expect(userItems[0].lon).toBe(45.6);
+});
+
+test('GET /images/:id/exif requires a logged-in user on a secured server', async () => {
+  const { store, router } = setup();
+  const meta = await store.ingest(await png(), 'm.png');
+
+  const anon = createResMock();
+  router.getHandlers.get('/images/:id/exif')!(
+    { skIsAuthenticated: false, params: { id: meta.id } },
+    anon,
+  );
+  await anon.done;
+  expect(anon.statusCode).toBe(401);
+
+  const user = createResMock();
+  router.getHandlers.get('/images/:id/exif')!(
+    {
+      skPrincipal: { identifier: 'u1', permissions: 'readonly' },
+      skIsAuthenticated: true,
+      params: { id: meta.id },
+    },
+    user,
+  );
+  await user.done;
+  expect(user.statusCode).toBe(200);
 });
 
 test('POST /images rejects an anonymous (not-logged-in) request with 401', async () => {
@@ -188,7 +355,7 @@ test('GET /images/cache reports size + count', async () => {
 });
 
 test('GET /config returns the capabilities payload when provided', async () => {
-  const store = new ImageStore(join(TMP_ROOT, randomUUID()));
+  const store = trackStore(join(TMP_ROOT, randomUUID()));
   const router = createRouterMock();
   registerImageRoutes(router as unknown as IRouter, {
     resolveStore: () => store,
@@ -204,10 +371,7 @@ test('DELETE /images/:id removes an existing image (authenticated)', async () =>
   const { store, router } = setup();
   const meta = await store.ingest(await png(), 'm.png');
   const res = createResMock();
-  router.deleteHandlers.get('/images/:id')!(
-    { skIsAuthenticated: true, params: { id: meta.id } },
-    res,
-  );
+  router.deleteHandlers.get('/images/:id')!({ ...AUTH, params: { id: meta.id } }, res);
   await res.done;
   expect(res.statusCode).toBe(200);
   expect((res.jsonBody as { ok: boolean }).ok).toBe(true);
@@ -217,10 +381,7 @@ test('DELETE /images/:id removes an existing image (authenticated)', async () =>
 test('DELETE /images/:id 404s an unknown id (authenticated)', async () => {
   const { router } = setup();
   const res = createResMock();
-  router.deleteHandlers.get('/images/:id')!(
-    { skIsAuthenticated: true, params: { id: 'nope-0000' } },
-    res,
-  );
+  router.deleteHandlers.get('/images/:id')!({ ...AUTH, params: { id: 'nope-0000' } }, res);
   await res.done;
   expect(res.statusCode).toBe(404);
 });
@@ -231,7 +392,7 @@ test('DELETE /images/cache purges the variant cache (authenticated)', async () =
   await store.getServable(meta.id, 320);
   expect((await store.cacheStats()).files).toBe(1);
   const res = createResMock();
-  router.deleteHandlers.get('/images/cache')!({ skIsAuthenticated: true }, res);
+  router.deleteHandlers.get('/images/cache')!({ ...AUTH }, res);
   await res.done;
   expect(res.statusCode).toBe(200);
   expect((res.jsonBody as { ok: boolean }).ok).toBe(true);
@@ -279,17 +440,14 @@ test('collections: create (auth), add image, filtered list, and counts', async (
   const img = await store.ingest(await png(), 'a.png');
 
   const created = createResMock();
-  router.postHandlers.get('/collections')!(
-    { skIsAuthenticated: true, body: { name: 'Deck' } },
-    created,
-  );
+  router.postHandlers.get('/collections')!({ ...AUTH, body: { name: 'Deck' } }, created);
   await created.done;
   expect(created.statusCode).toBe(201);
   const colId = (created.jsonBody as { id: string }).id;
 
   const add = createResMock();
   router.postHandlers.get('/collections/:id/images/:imageId')!(
-    { skIsAuthenticated: true, params: { id: colId, imageId: img.id } },
+    { ...AUTH, params: { id: colId, imageId: img.id } },
     add,
   );
   await add.done;
@@ -315,10 +473,7 @@ test('POST /collections rejects anonymous and empty names', async () => {
   expect(anon.statusCode).toBe(401);
 
   const empty = createResMock();
-  router.postHandlers.get('/collections')!(
-    { skIsAuthenticated: true, body: { name: '   ' } },
-    empty,
-  );
+  router.postHandlers.get('/collections')!({ ...AUTH, body: { name: '   ' } }, empty);
   await empty.done;
   expect(empty.statusCode).toBe(400);
 });
@@ -326,16 +481,13 @@ test('POST /collections rejects anonymous and empty names', async () => {
 test('PUT /collections/:id renames — 200 ok, 404 unknown, 400 bad id, 401 anon', async () => {
   const { store, router } = setup();
   const created = createResMock();
-  router.postHandlers.get('/collections')!(
-    { skIsAuthenticated: true, body: { name: 'Deck' } },
-    created,
-  );
+  router.postHandlers.get('/collections')!({ ...AUTH, body: { name: 'Deck' } }, created);
   await created.done;
   const id = (created.jsonBody as { id: string }).id;
 
   const ok = createResMock();
   router.putHandlers.get('/collections/:id')!(
-    { skIsAuthenticated: true, params: { id }, body: { name: 'Deck plans' } },
+    { ...AUTH, params: { id }, body: { name: 'Deck plans' } },
     ok,
   );
   await ok.done;
@@ -344,7 +496,7 @@ test('PUT /collections/:id renames — 200 ok, 404 unknown, 400 bad id, 401 anon
 
   const notFound = createResMock();
   router.putHandlers.get('/collections/:id')!(
-    { skIsAuthenticated: true, params: { id: 'nope-0000' }, body: { name: 'X' } },
+    { ...AUTH, params: { id: 'nope-0000' }, body: { name: 'X' } },
     notFound,
   );
   await notFound.done;
@@ -352,7 +504,7 @@ test('PUT /collections/:id renames — 200 ok, 404 unknown, 400 bad id, 401 anon
 
   const bad = createResMock();
   router.putHandlers.get('/collections/:id')!(
-    { skIsAuthenticated: true, params: { id: '../x' }, body: { name: 'X' } },
+    { ...AUTH, params: { id: '../x' }, body: { name: 'X' } },
     bad,
   );
   await bad.done;
@@ -371,17 +523,14 @@ test('DELETE collection + remove-image — success, 404, and auth', async () => 
   const { store, router } = setup();
   const img = await store.ingest(await png(), 'a.png');
   const created = createResMock();
-  router.postHandlers.get('/collections')!(
-    { skIsAuthenticated: true, body: { name: 'Deck' } },
-    created,
-  );
+  router.postHandlers.get('/collections')!({ ...AUTH, body: { name: 'Deck' } }, created);
   await created.done;
   const id = (created.jsonBody as { id: string }).id;
   store.addImageToCollection(id, img.id);
 
   const rm = createResMock();
   router.deleteHandlers.get('/collections/:id/images/:imageId')!(
-    { skIsAuthenticated: true, params: { id, imageId: img.id } },
+    { ...AUTH, params: { id, imageId: img.id } },
     rm,
   );
   await rm.done;
@@ -389,21 +538,21 @@ test('DELETE collection + remove-image — success, 404, and auth', async () => 
 
   const rmMissing = createResMock();
   router.deleteHandlers.get('/collections/:id/images/:imageId')!(
-    { skIsAuthenticated: true, params: { id, imageId: img.id } },
+    { ...AUTH, params: { id, imageId: img.id } },
     rmMissing,
   );
   await rmMissing.done;
   expect(rmMissing.statusCode).toBe(404);
 
   const del = createResMock();
-  router.deleteHandlers.get('/collections/:id')!({ skIsAuthenticated: true, params: { id } }, del);
+  router.deleteHandlers.get('/collections/:id')!({ ...AUTH, params: { id } }, del);
   await del.done;
   expect(del.statusCode).toBe(200);
   expect(store.getCollection(id)).toBeNull();
 
   const delMissing = createResMock();
   router.deleteHandlers.get('/collections/:id')!(
-    { skIsAuthenticated: true, params: { id: 'nope-0000' } },
+    { ...AUTH, params: { id: 'nope-0000' } },
     delMissing,
   );
   await delMissing.done;
@@ -422,7 +571,7 @@ test('POST add-to-collection — 400 bad id, 404 missing, 401 anon', async () =>
   const { router } = setup();
   const bad = createResMock();
   router.postHandlers.get('/collections/:id/images/:imageId')!(
-    { skIsAuthenticated: true, params: { id: '../x', imageId: 'y' } },
+    { ...AUTH, params: { id: '../x', imageId: 'y' } },
     bad,
   );
   await bad.done;
@@ -430,7 +579,7 @@ test('POST add-to-collection — 400 bad id, 404 missing, 401 anon', async () =>
 
   const missing = createResMock();
   router.postHandlers.get('/collections/:id/images/:imageId')!(
-    { skIsAuthenticated: true, params: { id: 'nope-0000', imageId: 'also-0000' } },
+    { ...AUTH, params: { id: 'nope-0000', imageId: 'also-0000' } },
     missing,
   );
   await missing.done;

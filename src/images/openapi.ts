@@ -144,6 +144,9 @@ export function imageOpenApi(): object {
         },
         post: {
           summary: 'Upload an image (write access required).',
+          description:
+            'Creates one image resource. Clients upload several files by sending several of these ' +
+            'requests (one per file); the web app does this sequentially with per-file progress.',
           security: SECURED,
           requestBody: {
             required: true,

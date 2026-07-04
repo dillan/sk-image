@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import type { Collection, ImageAsset, PluginConfig, SortKey, SortOrder } from '../api';
+import type { Collection, ImageAsset, SortKey, SortOrder } from '../api';
 import { ImageDetail } from '../components/ImageDetail';
 import { UploadButton } from '../components/UploadButton';
+import { useFileDrop } from '../lib/uploads';
 import { formatBytes } from '../lib/format';
 
 function meta(image: ImageAsset): string {
@@ -13,10 +14,12 @@ function meta(image: ImageAsset): string {
 
 export function LibraryScreen({
   collections,
-  config,
+  enqueue,
+  uploadTick,
 }: {
   collections: Collection[];
-  config: PluginConfig | null;
+  enqueue: (files: File[]) => void;
+  uploadTick: number;
 }) {
   const [images, setImages] = useState<ImageAsset[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,28 +27,40 @@ export function LibraryScreen({
   const [order, setOrder] = useState<SortOrder>('desc');
   const [collection, setCollection] = useState<string>('');
   const [selected, setSelected] = useState<ImageAsset | null>(null);
+  const reqToken = useRef(0);
 
   const refresh = useCallback(() => {
+    const token = ++reqToken.current; // latest-wins: ignore out-of-order list responses
     api
       .list({ sort, order, collection: collection || undefined })
       .then((imgs) => {
+        if (token !== reqToken.current) return;
         setImages(imgs);
         setError(null);
       })
       .catch((e: Error) => {
+        if (token !== reqToken.current) return;
         setImages([]);
         setError(e.message);
       });
   }, [sort, order, collection]);
 
-  useEffect(() => refresh(), [refresh]);
+  // Refresh on mount, on sort/filter change, and whenever an upload completes (uploadTick bumps).
+  useEffect(() => refresh(), [refresh, uploadTick]);
+
+  const drop = useFileDrop(enqueue);
 
   return (
-    <>
+    <div className="library" {...drop.handlers}>
+      {drop.dragging && (
+        <div className="dropzone" aria-hidden="true">
+          <div className="dropzone__inner">Drop images to upload</div>
+        </div>
+      )}
       <div className="page-head">
         <h1>Image library</h1>
         <div className="page-head__spacer" />
-        <UploadButton config={config} onUploaded={refresh} />
+        <UploadButton onFiles={enqueue} />
       </div>
 
       <div className="toolbar">
@@ -142,6 +157,6 @@ export function LibraryScreen({
           }}
         />
       )}
-    </>
+    </div>
   );
 }

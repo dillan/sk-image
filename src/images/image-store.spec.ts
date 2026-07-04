@@ -372,3 +372,11 @@ describe('ImageStore — EXIF, sort, collections (M2)', () => {
     expect(store.deleteCollection('..')).toBe(false);
   });
 });
+
+test('imageCount reflects the number of stored images', async () => {
+  const { store } = freshStore();
+  expect(store.imageCount()).toBe(0);
+  await store.ingest(await png(), 'a.png');
+  await store.ingest(await png(), 'b.png');
+  expect(store.imageCount()).toBe(2);
+});

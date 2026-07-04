@@ -346,6 +346,11 @@ export class ImageStore {
     return this.meta.list(opts);
   }
 
+  /** Number of images in the library (synchronous — used for plugin status reporting). */
+  imageCount(): number {
+    return this.meta.count();
+  }
+
   async getMeta(id: string): Promise<ImageMeta | null> {
     if (!isValidId(id)) return null;
     return this.meta.get(id);

@@ -49,6 +49,8 @@ function createAppMock(dataDir: string): ServerAPI {
     debug: () => {},
     error: () => {},
     setPluginStatus: () => {},
+    setPluginError: () => {},
+    notifications: { raise: () => 'id' },
   } as unknown as ServerAPI;
 }
 
@@ -92,4 +94,10 @@ test('GET /config advertises the width allow-list + limits (single source of tru
   expect(body.maxCacheBytes).toBe(1 * 1024 * 1024 * 1024);
   expect(body.supportedFormats).toContain('heic');
   expect(body.supportedFormats).toContain('svg');
+});
+
+test('statusMessage reports readiness before the store is built', () => {
+  const plugin = skImagePlugin(createAppMock(TMP));
+  expect(typeof plugin.statusMessage).toBe('function');
+  expect(plugin.statusMessage?.()).toBe('Ready');
 });

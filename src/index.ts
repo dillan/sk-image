@@ -23,10 +23,39 @@ import { registerImageRoutes } from './images/image-router';
 
 const SUPPORTED_FORMATS: readonly ImageFormat[] = ['svg', 'jpeg', 'png', 'webp', 'gif', 'heic'];
 
+/** Human-readable binary size for the plugin status line (e.g. "1.0 GiB"). */
+function fmtBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KiB', 'MiB', 'GiB', 'TiB'];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+}
+
+/** Surface a store-init failure on the boat's alarm surface when the server exposes notifications. */
+function raiseStoreUnavailable(app: ServerAPI, detail: string): void {
+  const notifications = (
+    app as { notifications?: { raise?: (o: { state: string; message: string }) => unknown } }
+  ).notifications;
+  try {
+    notifications?.raise?.({
+      state: 'warn',
+      message: `SK Image: image store unavailable (${detail})`,
+    });
+  } catch {
+    // Older servers may not expose the v2 Notifications API — setPluginError still surfaces it.
+  }
+}
+
 export = function skImagePlugin(app: ServerAPI): Plugin {
   let pool: WorkerPoolImageProcessor | null = null;
   let store: ImageStore | null = null;
   let configuredMaxCacheBytes = DEFAULT_MAX_CACHE_BYTES;
+  let initFailed = false;
 
   // Built lazily on first route use — the data dir is only known once the server has initialized.
   const resolveStore = (): ImageStore | null => {
@@ -35,9 +64,14 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
         const dir = nodePath.join(app.getDataDirPath(), 'images');
         pool = new WorkerPoolImageProcessor();
         store = new ImageStore(dir, pool, { maxCacheBytes: configuredMaxCacheBytes });
+        initFailed = false;
         app.debug(`[sk-image] store ready at ${dir} (workers=${pool.size})`);
       } catch (e) {
-        app.error(`[sk-image] failed to initialize image store: ${(e as Error).message}`);
+        const detail = (e as Error).message;
+        initFailed = true;
+        app.error(`[sk-image] failed to initialize image store: ${detail}`);
+        app.setPluginError(`Image store unavailable: ${detail}`);
+        raiseStoreUnavailable(app, detail);
         // Tear down the just-spawned worker pool so its threads don't leak on a failed init.
         if (pool) {
           void pool.destroy().catch(() => undefined);
@@ -72,6 +106,7 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
       const value = (settings as { maxCacheBytes?: number }).maxCacheBytes;
       configuredMaxCacheBytes =
         typeof value === 'number' && value > 0 ? value : DEFAULT_MAX_CACHE_BYTES;
+      initFailed = false;
       app.setPluginStatus('Started');
     },
     stop: () => {
@@ -84,6 +119,11 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
       pool = null;
       store = null;
       app.setPluginStatus('Stopped');
+    },
+    statusMessage: () => {
+      if (initFailed) return 'Image store unavailable — see server log';
+      if (!store) return 'Ready';
+      return `${store.imageCount()} images · cache budget ${fmtBytes(configuredMaxCacheBytes)}`;
     },
     registerWithRouter: (router) => {
       registerImageRoutes(router, {

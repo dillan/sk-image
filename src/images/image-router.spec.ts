@@ -5,7 +5,8 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import type { IRouter } from 'express';
 import { ImageStore } from './image-store';
-import { registerImageRoutes, isAuthenticatedRequest } from './image-router';
+import { registerImageRoutes } from './image-router';
+import { isAuthorizedWriter } from './sk-request';
 
 type Handler = (req: unknown, res: unknown) => void;
 
@@ -102,20 +103,28 @@ function setup(): { store: ImageStore; router: RouterMock } {
   return { store, router };
 }
 
-// isAuthenticatedRequest takes an SK-augmented express Request; feed it small partials.
-type SkReq = Parameters<typeof isAuthenticatedRequest>[0];
+// isAuthorizedWriter takes an SK-augmented express Request; feed it small partials.
+type SkReq = Parameters<typeof isAuthorizedWriter>[0];
 const asReq = (r: object): SkReq => r as unknown as SkReq;
 
 afterAll(() => rmSync(TMP_ROOT, { recursive: true, force: true }));
 
-test('isAuthenticatedRequest: open when no security, requires a principal when security is on', () => {
-  expect(isAuthenticatedRequest(asReq({}))).toBe(true);
-  expect(isAuthenticatedRequest(asReq({ skPrincipal: { identifier: 'u1' } }))).toBe(true);
-  expect(isAuthenticatedRequest(asReq({ skIsAuthenticated: true }))).toBe(true);
-  expect(isAuthenticatedRequest(asReq({ skIsAuthenticated: false }))).toBe(false);
-  expect(isAuthenticatedRequest(asReq({ skPrincipal: null, skIsAuthenticated: false }))).toBe(
-    false,
-  );
+test('isAuthorizedWriter: open when no security, requires a principal when security is on', () => {
+  expect(isAuthorizedWriter(asReq({}))).toBe(true);
+  expect(isAuthorizedWriter(asReq({ skPrincipal: { identifier: 'u1' } }))).toBe(true);
+  expect(isAuthorizedWriter(asReq({ skIsAuthenticated: true }))).toBe(true);
+  expect(isAuthorizedWriter(asReq({ skIsAuthenticated: false }))).toBe(false);
+  expect(isAuthorizedWriter(asReq({ skPrincipal: null, skIsAuthenticated: false }))).toBe(false);
+});
+
+test('isAuthorizedWriter: an anonymous readonly principal (Allow Readonly Access) cannot write', () => {
+  // The SK server marks anonymous readonly visitors as authenticated with permissions:'readonly'.
+  // Writes must require read-write/admin — presence of a principal is not enough.
+  const ro = asReq({
+    skPrincipal: { identifier: 'AUTO', permissions: 'readonly' },
+    skIsAuthenticated: true,
+  });
+  expect(isAuthorizedWriter(ro)).toBe(false);
 });
 
 test('POST /images rejects an anonymous (not-logged-in) request with 401', async () => {

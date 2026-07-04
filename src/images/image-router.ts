@@ -1,31 +1,7 @@
 import type { IRouter, Request, Response } from 'express';
 import multer from 'multer';
 import { ImageStore, ImageValidationError, MAX_UPLOAD_BYTES } from './image-store';
-
-/**
- * Signal K does not expose a request principal in its public plugin API, but its security
- * middleware augments authenticated requests with `skPrincipal` at runtime. We treat:
- *  - principal present with an identifier  => authenticated (allowed)
- *  - security configured but no principal   => anonymous (rejected)
- *  - no security signals at all             => security disabled / no users => allowed
- * SK's own middleware is the primary gate (it already protects the existing write routes); this is
- * a defensive in-handler check. Verify against a secured server during the e2e step.
- */
-interface SkRequest extends Request {
-  skPrincipal?: { identifier?: string } | null;
-  skIsAuthenticated?: boolean;
-}
-
-export function isAuthenticatedRequest(req: SkRequest): boolean {
-  if (req.skPrincipal === undefined && req.skIsAuthenticated === undefined) {
-    return true; // security disabled (no users) — consistent with the plugin's other write routes
-  }
-  return Boolean(req.skPrincipal && req.skPrincipal.identifier) || req.skIsAuthenticated === true;
-}
-
-function principalId(req: SkRequest): string | null {
-  return (req.skPrincipal && req.skPrincipal.identifier) || null;
-}
+import { type SkRequest, isAuthorizedWriter, principalId } from './sk-request';
 
 const ID_RE = /^[A-Za-z0-9-]+$/;
 
@@ -57,7 +33,7 @@ export interface ImageRouterDeps {
 
 /** Register the image-asset routes on the plugin's Express router (mounted at /plugins/sk-image). */
 export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): void {
-  const isAuth = deps.isAuthenticated ?? isAuthenticatedRequest;
+  const isAuth = deps.isAuthenticated ?? isAuthorizedWriter;
   const getStore = (res: Response): ImageStore | null => {
     const store = deps.resolveStore();
     if (!store) sendError(res, 503, 'Image service is not ready');

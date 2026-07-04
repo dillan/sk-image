@@ -7,14 +7,27 @@ import { MetadataStore } from './metadata-store';
 import type { ImageMeta } from './image-store';
 
 const dirs: string[] = [];
+const opened: MetadataStore[] = [];
 function freshDb(): MetadataStore {
   const dir = join(tmpdir(), `sk-image-meta-${randomUUID()}`);
   mkdirSync(dir, { recursive: true });
   dirs.push(dir);
-  return new MetadataStore(join(dir, 'metadata.db'));
+  const db = new MetadataStore(join(dir, 'metadata.db'));
+  opened.push(db);
+  return db;
 }
 afterEach(() => {
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  // Close the SQLite handle before removing the dir — an open db file blocks rmSync on Windows.
+  for (const db of opened.splice(0)) {
+    try {
+      db.close();
+    } catch {
+      /* already closed */
+    }
+  }
+  for (const d of dirs.splice(0)) {
+    rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
 });
 
 function meta(over: Partial<ImageMeta> = {}): ImageMeta {

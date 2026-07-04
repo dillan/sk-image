@@ -96,8 +96,15 @@ const png = (): Promise<Buffer> =>
     .png()
     .toBuffer();
 
+// Track every store so its SQLite handle is closed before rmSync (Windows can't remove an open file).
+const opened: ImageStore[] = [];
+function trackStore(...args: ConstructorParameters<typeof ImageStore>): ImageStore {
+  const store = new ImageStore(...args);
+  opened.push(store);
+  return store;
+}
 function setup(): { store: ImageStore; router: RouterMock } {
-  const store = new ImageStore(join(TMP_ROOT, randomUUID()));
+  const store = trackStore(join(TMP_ROOT, randomUUID()));
   const router = createRouterMock();
   registerImageRoutes(router as unknown as IRouter, { resolveStore: () => store });
   return { store, router };
@@ -109,7 +116,16 @@ const asReq = (r: object): SkReq => r as unknown as SkReq;
 /** A logged-in read-write principal — the shape SK attaches for an authorized writer. */
 const AUTH = { skPrincipal: { identifier: 'u1', permissions: 'readwrite' } };
 
-afterAll(() => rmSync(TMP_ROOT, { recursive: true, force: true }));
+afterAll(() => {
+  for (const s of opened) {
+    try {
+      s.close();
+    } catch {
+      /* already closed */
+    }
+  }
+  rmSync(TMP_ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+});
 
 test('isAuthorizedWriter: open only when no security; otherwise requires read-write/admin', () => {
   expect(isAuthorizedWriter(asReq({}))).toBe(true); // no security strategy at all → open
@@ -339,7 +355,7 @@ test('GET /images/cache reports size + count', async () => {
 });
 
 test('GET /config returns the capabilities payload when provided', async () => {
-  const store = new ImageStore(join(TMP_ROOT, randomUUID()));
+  const store = trackStore(join(TMP_ROOT, randomUUID()));
   const router = createRouterMock();
   registerImageRoutes(router as unknown as IRouter, {
     resolveStore: () => store,

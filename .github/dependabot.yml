@@ -9,6 +9,12 @@ updates:
       dev-dependencies:
         dependency-type: development
         update-types: [minor, patch]
+    ignore:
+      # @types/node must track the minimum supported Node (engines: ">=24"); a newer major types
+      # Node APIs that don't exist on the Node the plugin actually runs on, so code could type-check
+      # yet crash at runtime. Bump this major only when engines.node is raised.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /

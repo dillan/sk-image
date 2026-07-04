@@ -29,6 +29,10 @@ test('write routes are secured and document a 401; read routes are not secured',
           op.responses['401'],
           `${method.toUpperCase()} ${path} must document 401`,
         ).toBeDefined();
+        expect(
+          op.responses['403'],
+          `${method.toUpperCase()} ${path} must document 403`,
+        ).toBeDefined();
       }
     }
   }

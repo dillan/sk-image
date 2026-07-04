@@ -159,7 +159,8 @@ export function imageOpenApi(): object {
           responses: {
             '201': jsonResponse('Stored image metadata', '#/components/schemas/ImageMeta'),
             '400': errorResponse('No file provided'),
-            '401': errorResponse('Write access required'),
+            '401': errorResponse('Login required (anonymous request)'),
+            '403': errorResponse('Insufficient permission (read-only account)'),
             '413': errorResponse('File exceeds the size limit'),
             '415': errorResponse('Unsupported or unsafe content'),
           },
@@ -184,7 +185,8 @@ export function imageOpenApi(): object {
           parameters: [idParam('id')],
           responses: {
             '200': okResponse,
-            '401': errorResponse('Write access required'),
+            '401': errorResponse('Login required (anonymous request)'),
+            '403': errorResponse('Insufficient permission (read-only account)'),
             '404': errorResponse('Image not found'),
           },
         },
@@ -207,7 +209,11 @@ export function imageOpenApi(): object {
         delete: {
           summary: 'Purge generated variants (write access required).',
           security: SECURED,
-          responses: { '200': okResponse, '401': errorResponse('Write access required') },
+          responses: {
+            '200': okResponse,
+            '401': errorResponse('Login required (anonymous request)'),
+            '403': errorResponse('Insufficient permission (read-only account)'),
+          },
         },
       },
       '/collections': {
@@ -231,7 +237,8 @@ export function imageOpenApi(): object {
           responses: {
             '201': jsonResponse('Created collection', '#/components/schemas/Collection'),
             '400': errorResponse('A collection name is required'),
-            '401': errorResponse('Write access required'),
+            '401': errorResponse('Login required (anonymous request)'),
+            '403': errorResponse('Insufficient permission (read-only account)'),
           },
         },
       },
@@ -244,7 +251,8 @@ export function imageOpenApi(): object {
           responses: {
             '200': okResponse,
             '400': errorResponse('A collection name is required'),
-            '401': errorResponse('Write access required'),
+            '401': errorResponse('Login required (anonymous request)'),
+            '403': errorResponse('Insufficient permission (read-only account)'),
             '404': errorResponse('Collection not found'),
           },
         },
@@ -254,7 +262,8 @@ export function imageOpenApi(): object {
           parameters: [idParam('id')],
           responses: {
             '200': okResponse,
-            '401': errorResponse('Write access required'),
+            '401': errorResponse('Login required (anonymous request)'),
+            '403': errorResponse('Insufficient permission (read-only account)'),
             '404': errorResponse('Collection not found'),
           },
         },
@@ -267,7 +276,8 @@ export function imageOpenApi(): object {
           responses: {
             '200': okResponse,
             '400': errorResponse('Invalid id'),
-            '401': errorResponse('Write access required'),
+            '401': errorResponse('Login required (anonymous request)'),
+            '403': errorResponse('Insufficient permission (read-only account)'),
             '404': errorResponse('Collection or image not found'),
           },
         },
@@ -278,7 +288,8 @@ export function imageOpenApi(): object {
           responses: {
             '200': okResponse,
             '400': errorResponse('Invalid id'),
-            '401': errorResponse('Write access required'),
+            '401': errorResponse('Login required (anonymous request)'),
+            '403': errorResponse('Insufficient permission (read-only account)'),
             '404': errorResponse('Image not in collection'),
           },
         },

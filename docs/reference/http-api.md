@@ -1,6 +1,6 @@
 # HTTP API
 
-All routes are served by the Signal K server under `/plugins/sk-image`. When server security is enabled, the mutating routes (upload, delete, cache purge, collection edits) require **write access** — a read-write or admin principal; an authenticated read-only principal is rejected. Read routes are available to any client that can read Signal K data.
+All routes are served by the Signal K server under `/plugins/sk-image`. When server security is enabled, the mutating routes (upload, delete, cache purge, collection edits) require **write access** — a read-write or admin principal. A denied write returns `401` for an anonymous request (log in) or `403` for a logged-in read-only account (your account lacks write access). Read routes are available to any client that can read Signal K data.
 
 ## `GET /config`
 
@@ -23,7 +23,7 @@ Upload an image. `multipart/form-data` with a single `file` field. **Write acces
 
 - The type is detected from content (magic bytes), not the filename or MIME type.
 - Returns `201` with the stored metadata (`id`, `name`, `format`, `width`, `height`, `bytes`, `animated`, `createdAt`) plus a relative `url`.
-- Errors: `401` (not logged in), `413` (over the size limit), `415` (unsupported / unsafe content).
+- Errors: `401` (not logged in), `403` (logged in without write access), `413` (over the size limit), `415` (unsupported / unsafe content).
 
 ## `GET /images`
 

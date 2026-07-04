@@ -1,7 +1,7 @@
 import type { IRouter, Request, Response } from 'express';
 import multer from 'multer';
 import { ImageStore, ImageValidationError, MAX_UPLOAD_BYTES } from './image-store';
-import { type SkRequest, isAuthorizedWriter, principalId } from './sk-request';
+import { type SkRequest, isAuthorizedWriter, isAuthenticatedUser, principalId } from './sk-request';
 
 const ID_RE = /^[A-Za-z0-9-]+$/;
 
@@ -34,6 +34,18 @@ export interface ImageRouterDeps {
 /** Register the image-asset routes on the plugin's Express router (mounted at /plugins/sk-image). */
 export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): void {
   const isAuth = deps.isAuthenticated ?? isAuthorizedWriter;
+  // Enforce write access, choosing the status that gives the client the right next step:
+  //  - 401 for an anonymous request (the web app prompts a login),
+  //  - 403 for a logged-in user whose account lacks write permission (no pointless login loop).
+  const requireWrite = (req: Request, res: Response, action: string): boolean => {
+    if (isAuth(req)) return true;
+    if (isAuthenticatedUser(req as SkRequest)) {
+      sendError(res, 403, `Insufficient permission to ${action}`);
+    } else {
+      sendError(res, 401, `Login required to ${action}`);
+    }
+    return false;
+  };
   const getStore = (res: Response): ImageStore | null => {
     const store = deps.resolveStore();
     if (!store) sendError(res, 503, 'Image service is not ready');
@@ -53,7 +65,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // POST /images — upload (auth required; auth is checked BEFORE multipart parsing).
   router.post('/images', (req: Request, res: Response) => {
-    if (!isAuth(req)) return sendError(res, 401, 'Login required to upload images');
+    if (!requireWrite(req, res, 'upload images')) return;
     single(req, res, (err: unknown) => {
       void (async () => {
         if (err) {
@@ -115,7 +127,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   router.delete('/images/cache', (req: Request, res: Response) => {
-    if (!isAuth(req)) return sendError(res, 401, 'Login required to purge the image cache');
+    if (!requireWrite(req, res, 'purge the image cache')) return;
     const store = getStore(res);
     if (!store) return;
     void (async () => {
@@ -151,7 +163,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // DELETE /images/:id — remove an image (auth required).
   router.delete('/images/:id', (req: Request, res: Response) => {
-    if (!isAuth(req)) return sendError(res, 401, 'Login required to delete images');
+    if (!requireWrite(req, res, 'delete images')) return;
     const id = String(req.params.id ?? '');
     if (!ID_RE.test(id)) return sendError(res, 400, 'Invalid image id');
     const store = getStore(res);
@@ -199,7 +211,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // POST /collections { name } — create a collection (auth required).
   router.post('/collections', (req: Request, res: Response) => {
-    if (!isAuth(req)) return sendError(res, 401, 'Login required to create a collection');
+    if (!requireWrite(req, res, 'create a collection')) return;
     const name = sanitizeName((req.body as { name?: unknown } | undefined)?.name);
     if (!name) return sendError(res, 400, 'A collection name is required');
     const store = getStore(res);
@@ -213,7 +225,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // PUT /collections/:id { name } — rename a collection (auth required).
   router.put('/collections/:id', (req: Request, res: Response) => {
-    if (!isAuth(req)) return sendError(res, 401, 'Login required to rename a collection');
+    if (!requireWrite(req, res, 'rename a collection')) return;
     const id = String(req.params.id ?? '');
     if (!ID_RE.test(id)) return sendError(res, 400, 'Invalid collection id');
     const name = sanitizeName((req.body as { name?: unknown } | undefined)?.name);
@@ -230,7 +242,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // DELETE /collections/:id — delete a collection (auth required). The images themselves are kept.
   router.delete('/collections/:id', (req: Request, res: Response) => {
-    if (!isAuth(req)) return sendError(res, 401, 'Login required to delete a collection');
+    if (!requireWrite(req, res, 'delete a collection')) return;
     const id = String(req.params.id ?? '');
     if (!ID_RE.test(id)) return sendError(res, 400, 'Invalid collection id');
     const store = getStore(res);
@@ -245,7 +257,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // POST /collections/:id/images/:imageId — add an image to a collection (auth required).
   router.post('/collections/:id/images/:imageId', (req: Request, res: Response) => {
-    if (!isAuth(req)) return sendError(res, 401, 'Login required to modify a collection');
+    if (!requireWrite(req, res, 'modify a collection')) return;
     const id = String(req.params.id ?? '');
     const imageId = String(req.params.imageId ?? '');
     if (!ID_RE.test(id) || !ID_RE.test(imageId)) return sendError(res, 400, 'Invalid id');
@@ -263,7 +275,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // DELETE /collections/:id/images/:imageId — remove an image from a collection (auth required).
   router.delete('/collections/:id/images/:imageId', (req: Request, res: Response) => {
-    if (!isAuth(req)) return sendError(res, 401, 'Login required to modify a collection');
+    if (!requireWrite(req, res, 'modify a collection')) return;
     const id = String(req.params.id ?? '');
     const imageId = String(req.params.imageId ?? '');
     if (!ID_RE.test(id) || !ID_RE.test(imageId)) return sendError(res, 400, 'Invalid id');

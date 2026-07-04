@@ -17,6 +17,17 @@ export function principalId(req: SkRequest): string | null {
 }
 
 /**
+ * True when the request carries a real logged-in principal — i.e. not anonymous. The server uses the
+ * identifier `AUTO` for the anonymous read-only principal it attaches under "Allow Readonly Access",
+ * so that one is treated as not-logged-in: a write attempt should prompt a login (401), not report a
+ * permission error (403). Used to pick the right status for a denied write.
+ */
+export function isAuthenticatedUser(req: SkRequest): boolean {
+  const id = req.skPrincipal?.identifier;
+  return Boolean(id && id !== 'AUTO');
+}
+
+/**
  * True when the request may perform a write (upload / delete / mutate collections).
  *
  * Signal K mounts plugin routers without auth middleware, so this is the only write gate on the

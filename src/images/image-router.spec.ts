@@ -153,6 +153,36 @@ test('reads stay open by design: list and EXIF are served without a principal', 
   expect(exif.statusCode).toBe(200);
 });
 
+test('denied writes: 403 for a logged-in read-only user, 401 for anonymous/AUTO', async () => {
+  const { router } = setup();
+
+  // A real logged-in read-only account is authenticated but not authorized → 403 (no login loop).
+  const ro = createResMock();
+  router.postHandlers.get('/collections')!(
+    {
+      skPrincipal: { identifier: 'guest', permissions: 'readonly' },
+      skIsAuthenticated: true,
+      body: { name: 'Deck' },
+    },
+    ro,
+  );
+  await ro.done;
+  expect(ro.statusCode).toBe(403);
+
+  // The anonymous AUTO principal (Allow Readonly Access) should be prompted to log in → 401.
+  const auto = createResMock();
+  router.postHandlers.get('/collections')!(
+    {
+      skPrincipal: { identifier: 'AUTO', permissions: 'readonly' },
+      skIsAuthenticated: true,
+      body: { name: 'Deck' },
+    },
+    auto,
+  );
+  await auto.done;
+  expect(auto.statusCode).toBe(401);
+});
+
 test('POST /images rejects an anonymous (not-logged-in) request with 401', async () => {
   const { router } = setup();
   const res = createResMock();

@@ -11,6 +11,7 @@ import {
 import { WorkerPoolImageProcessor } from './images/worker-pool';
 import { WIDTH_ALLOWLIST } from './images/image-processing';
 import { registerImageRoutes } from './images/image-router';
+import { imageOpenApi } from './images/openapi';
 
 /**
  * SK Image — a standalone Signal K server plugin that owns the boat's image library:
@@ -125,6 +126,7 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
       if (!store) return 'Ready';
       return `${store.imageCount()} images · cache budget ${fmtBytes(configuredMaxCacheBytes)}`;
     },
+    getOpenApi: () => imageOpenApi(),
     registerWithRouter: (router) => {
       registerImageRoutes(router, {
         resolveStore,

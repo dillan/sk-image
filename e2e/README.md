@@ -37,9 +37,9 @@ This reuses the Docker SK Image server, builds and serves the KIP app, and drive
 
 ## Authorization matrix (secured server)
 
-A separate, API-only Playwright spec (`auth/authz-matrix.spec.ts`) pins how the plugin's REST API behaves when the Signal K server has **security enabled**. The fact it documents: signalk-server admin-gates **all** `/plugins/*` routes, so `/plugins/sk-image/*` is **admin-only** under security — read-write, read-only, and anonymous requests all get `401` from the server before the plugin's router runs.
+A separate, API-only Playwright spec (`auth/authz-matrix.spec.ts`) pins how the plugin's REST API behaves when the Signal K server has **security enabled**, across both mounts. It documents two facts: (1) signalk-server admin-gates **all** `/plugins/*` routes, so the `/plugins/sk-image/*` alias is **admin-only** under security; and (2) `/signalk/v1/api/sk-image/*` is **not** admin-gated, so ordinary crew reach it and the plugin's own auth applies — reads are open, writes need read-write/admin (anonymous → `401`, logged-in read-only → `403`). It also checks the v2 `images` resource type (crew-readable, no GPS) and that the `/sk-image` web app bundle loads for crew.
 
-It runs against the `signalk-secured` compose service (security on, three baked test users — `admin`/`adminpw` (admin), `writer`/`writerpw` (readwrite), `reader`/`readerpw` (readonly) — and `allow_readonly` on to show it makes no difference):
+It runs against the `signalk-secured` compose service (security on, three baked test users — `admin`/`adminpw` (admin), `writer`/`writerpw` (readwrite), `reader`/`readerpw` (readonly) — and `allow_readonly` on):
 
 ```bash
 cd e2e
@@ -48,7 +48,7 @@ SIGNALK_SECURED_URL=http://localhost:3008 npm run authz
 docker compose down
 ```
 
-The users, secret key, and strategy live in `signalk-config-secured/` (test-only values). See [`../docs/developers/security-model.md`](../docs/developers/security-model.md) for why the plugin's own in-handler auth is only defense-in-depth given this server behavior.
+The users, secret key, and strategy live in `signalk-config-secured/` (test-only values). See [`../docs/developers/security-model.md`](../docs/developers/security-model.md) for the full access model — why the plugin's own in-handler auth is the effective gate on the crew-reachable mount and only defense-in-depth on the admin-gated `/plugins` alias.
 
 ## What it does
 

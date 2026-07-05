@@ -1,7 +1,12 @@
 // API client for the SK Image plugin. The web app is served same-origin by the Signal K server, so
 // it always calls the plugin's absolute path and authenticates with the SK session cookie.
-
-const BASE = '/plugins/sk-image';
+//
+// This targets the `/signalk/v1/api` mount, NOT `/plugins/sk-image`: a secured server admin-gates
+// every `/plugins/*` route, which would lock ordinary crew (read-only / read-write) out of the whole
+// library. The `/signalk/v1/api` path is not admin-gated, so the plugin's own auth applies — crew can
+// view, read-write users can manage, and anonymous visitors get whatever "Allow Readonly Access"
+// grants. (Keep in sync with SIGNALK_V1_IMAGE_BASE in src/images/image-router.ts.)
+const BASE = '/signalk/v1/api/sk-image';
 
 export interface ImageAsset {
   id: string;

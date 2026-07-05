@@ -74,6 +74,10 @@ test('getResource supports dot-path property extraction', async () => {
   expect(res.value).toBe('png');
 });
 
+test('getResource rejects a request for a property that does not exist', async () => {
+  await expect(provider().methods.getResource('plain2', 'nope.deep')).rejects.toThrow();
+});
+
 test('the resource is read-only: setResource and deleteResource reject', async () => {
   await expect(provider().methods.setResource('x', {})).rejects.toThrow();
   await expect(provider().methods.deleteResource('x')).rejects.toThrow();

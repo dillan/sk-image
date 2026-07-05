@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/dillan/sk-image/compare/v1.2.0...v1.3.0) (2026-07-05)
+
+
+### Features
+
+* let crew view and manage the image library under security ([#9](https://github.com/dillan/sk-image/issues/9)) ([18b38cc](https://github.com/dillan/sk-image/commit/18b38cccbee7cfeb62d7c33a52276262fa2c64ef))
+
 # [1.2.0](https://github.com/dillan/sk-image/compare/v1.1.0...v1.2.0) (2026-07-05)
 
 

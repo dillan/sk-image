@@ -1,6 +1,8 @@
 # HTTP API
 
-All routes are served by the Signal K server under `/plugins/sk-image`. When server security is enabled, the mutating routes (upload, delete, cache purge, collection edits) require **write access** — a read-write or admin principal. A denied write returns `401` for an anonymous request (log in) or `403` for a logged-in read-only account (your account lacks write access). Read routes are available to any client that can read Signal K data.
+All routes are served by the Signal K server under `/plugins/sk-image`.
+
+> **Security note.** When the Signal K server has security enabled, it restricts **every** `/plugins/*` route — including all of these — to **admin** users. A non-admin request (read-write, read-only, or anonymous) gets `401` from the server _before_ it reaches this plugin, so with security on **only an admin can use the API at all**. On an **unsecured** server everything is open, and the plugin's own rules below apply: read routes are open (capture GPS/EXIF is limited to logged-in users), and the mutating routes (upload, delete, cache purge, collection edits) require write access.
 
 ## `GET /config`
 

@@ -351,6 +351,18 @@ export class ImageStore {
     return this.meta.count();
   }
 
+  // An opaque token that changes on any library/collection mutation (add, delete, collection edit,
+  // membership change). Clients poll `GET /revision` and refresh when it differs from what they last
+  // saw, so a change made in one browser shows up in another. In-memory: a server restart resets it,
+  // which at worst prompts one harmless refresh in a client that had an older value.
+  private rev = 0;
+  revision(): number {
+    return this.rev;
+  }
+  bumpRevision(): void {
+    this.rev += 1;
+  }
+
   async getMeta(id: string): Promise<ImageMeta | null> {
     if (!isValidId(id)) return null;
     return this.meta.get(id);

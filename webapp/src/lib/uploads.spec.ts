@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { aggregate, smoothSpeed, type UploadItem } from './uploads';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { renderHook, act, waitFor, cleanup } from '@testing-library/react';
+import { aggregate, smoothSpeed, useUploadQueue, type UploadItem } from './uploads';
+import { api, AuthRequiredError } from '../api';
 
 const item = (over: Partial<UploadItem>): UploadItem => ({
   id: 'x',
@@ -80,6 +82,47 @@ describe('aggregate', () => {
     expect(s.percent).toBe(0);
     expect(s.active).toBe(false);
     expect(s.total).toBe(0);
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+describe('useUploadQueue auth handling', () => {
+  it('stops the whole batch on the first auth failure and redirects once', async () => {
+    const onAuth = vi.fn();
+    vi.spyOn(api, 'upload').mockRejectedValue(new AuthRequiredError());
+    const { result } = renderHook(() => useUploadQueue(10 * 1024 * 1024, () => {}, onAuth));
+    const files = ['a', 'b', 'c'].map((n) => new File([n], `${n}.png`, { type: 'image/png' }));
+
+    act(() => result.current.enqueue(files));
+    await waitFor(() => expect(onAuth).toHaveBeenCalled());
+
+    expect(onAuth).toHaveBeenCalledTimes(1); // one redirect, not one per file
+    expect(api.upload).toHaveBeenCalledTimes(1); // stopped after the first 401
+    expect(result.current.items).toHaveLength(3);
+    expect(result.current.items.every((it) => it.status === 'error')).toBe(true);
+    expect(result.current.items.every((it) => it.error === 'Log in to upload')).toBe(true);
+  });
+
+  it('does not redirect when uploads succeed', async () => {
+    const onAuth = vi.fn();
+    vi.spyOn(api, 'upload').mockResolvedValue({
+      id: 'x',
+      name: 'a.png',
+      format: 'png',
+      width: 1,
+      height: 1,
+      bytes: 1,
+      animated: false,
+      createdAt: '',
+    });
+    const { result } = renderHook(() => useUploadQueue(10 * 1024 * 1024, () => {}, onAuth));
+    act(() => result.current.enqueue([new File(['a'], 'a.png', { type: 'image/png' })]));
+    await waitFor(() => expect(result.current.items[0]?.status).toBe('done'));
+    expect(onAuth).not.toHaveBeenCalled();
   });
 });
 

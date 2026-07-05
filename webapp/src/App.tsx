@@ -8,8 +8,12 @@ import { CollectionsScreen } from './screens/CollectionsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { UploadProgress } from './components/UploadProgress';
 import { useUploadQueue } from './lib/uploads';
-import { api } from './api';
+import { useRevisionPolling } from './lib/useRevisionPolling';
+import { api, goToLogin } from './api';
 import type { Collection, PluginConfig } from './api';
+
+/** How often to poll the change token so edits made in another browser show up here. */
+const REVISION_POLL_MS = 10_000;
 
 const NAV: { cluster: Cluster; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { cluster: 'library', label: 'Library', Icon: LibraryIcon },
@@ -79,9 +83,17 @@ export function App() {
 
   // The upload queue lives here, above the tab switch, so uploads keep going and stay visible when
   // the user browses to Collections/Settings mid-batch.
-  const uploads = useUploadQueue(config?.maxUploadBytes ?? 10 * 1024 * 1024, () =>
-    setUploadTick((t) => t + 1),
+  const uploads = useUploadQueue(
+    config?.maxUploadBytes ?? 10 * 1024 * 1024,
+    () => setUploadTick((t) => t + 1),
+    goToLogin,
   );
+
+  // Auto-refresh when the library changes elsewhere (another browser/device).
+  useRevisionPolling(() => {
+    setUploadTick((t) => t + 1);
+    refreshCollections();
+  }, REVISION_POLL_MS);
 
   return (
     <div className="shell">
@@ -110,6 +122,7 @@ export function App() {
             collections={collections}
             enqueue={uploads.enqueue}
             uploadTick={uploadTick}
+            config={config}
           />
         )}
         {cluster === 'collections' && (

@@ -116,6 +116,32 @@ const asReq = (r: object): SkReq => r as unknown as SkReq;
 /** A logged-in read-write principal — the shape SK attaches for an authorized writer. */
 const AUTH = { skPrincipal: { identifier: 'u1', permissions: 'readwrite' } };
 
+test('basePath prefixes every route so the /signalk/v1/api mount does not collide', () => {
+  const store = trackStore(join(TMP_ROOT, randomUUID()));
+  const router = createRouterMock();
+  registerImageRoutes(router as unknown as IRouter, { resolveStore: () => store }, '/sk-image');
+  // All routes live under the mount prefix (the shared /signalk/v1/api namespace is host to every
+  // plugin, so an un-prefixed "/config" or "/images" would clash).
+  expect(router.getHandlers.has('/sk-image/config')).toBe(true);
+  expect(router.getHandlers.has('/sk-image/images')).toBe(true);
+  expect(router.getHandlers.has('/sk-image/images/:id')).toBe(true);
+  expect(router.getHandlers.has('/sk-image/images/:id/exif')).toBe(true);
+  expect(router.postHandlers.has('/sk-image/images')).toBe(true);
+  expect(router.deleteHandlers.has('/sk-image/images/:id')).toBe(true);
+  expect(router.getHandlers.has('/sk-image/collections')).toBe(true);
+  // …and nothing is left at the un-prefixed root.
+  expect(router.getHandlers.has('/config')).toBe(false);
+  expect(router.getHandlers.has('/images')).toBe(false);
+});
+
+test('default (empty) basePath keeps the /plugins/sk-image routes unprefixed', () => {
+  const store = trackStore(join(TMP_ROOT, randomUUID()));
+  const router = createRouterMock();
+  registerImageRoutes(router as unknown as IRouter, { resolveStore: () => store });
+  expect(router.getHandlers.has('/config')).toBe(true);
+  expect(router.postHandlers.has('/images')).toBe(true);
+});
+
 afterAll(() => {
   for (const s of opened) {
     try {

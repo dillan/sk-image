@@ -13,3 +13,22 @@ services:
       IS_IN_DOCKER: 'true'
     ports:
       - '${SIGNALK_PORT:-3000}:3000'
+
+  # A SECURED server (security ON via settings.security.strategy) for the authorization-matrix spec.
+  # The secured config is mounted over the baked one file-by-file, so the plugin install at
+  # .signalk/node_modules/sk-image is preserved. Users + secretKey are baked in security.json (test
+  # values only). Started on demand: `docker compose up -d signalk-secured`.
+  signalk-secured:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+    container_name: sk-image-signalk-secured
+    entrypoint: ['node', '/home/node/signalk/node_modules/signalk-server/bin/signalk-server']
+    environment:
+      IS_IN_DOCKER: 'true'
+    volumes:
+      - ./signalk-config-secured/settings.json:/home/node/.signalk/settings.json:ro
+      - ./signalk-config-secured/security.json:/home/node/.signalk/security.json:ro
+      - ./signalk-config-secured/plugin-config-data/sk-image.json:/home/node/.signalk/plugin-config-data/sk-image.json:ro
+    ports:
+      - '${SIGNALK_SECURED_PORT:-3008}:3000'

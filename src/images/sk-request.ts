@@ -41,10 +41,14 @@ export function canReadSensitiveMetadata(req: SkRequest): boolean {
 /**
  * True when the request may perform a write (upload / delete / mutate collections).
  *
- * Signal K mounts plugin routers without auth middleware, so this is the only write gate on the
- * plugin's routes. It mirrors the server's own rule: a write needs read-write or admin permission.
- * An authenticated readonly principal — including the anonymous `AUTO`/readonly one the server
- * attaches when "Allow Readonly Access" is on — is rejected.
+ * Reachability note: when server security is enabled, signalk-server fronts ALL `/plugins/*` routes
+ * with an admin-only guard (`app.use('/plugins', adminAuthenticationMiddleware)` in tokensecurity),
+ * so only an `admin` principal ever reaches this plugin — read-write, read-only, and anonymous
+ * requests all get 401 from the server first. This in-handler check is therefore defense-in-depth:
+ * the effective gate only on an UNSECURED server (no `/plugins` middleware), and a redundant belt on
+ * a secured one (where only admins arrive, and admins always have write permission). It mirrors the
+ * server's write rule regardless — a write needs read-write or admin permission; an authenticated
+ * read-only principal (including the anonymous `AUTO`/readonly one) is rejected.
  */
 export function isAuthorizedWriter(req: SkRequest): boolean {
   // Fail open only when no security strategy is active at all (both signals unset). A secured

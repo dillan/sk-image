@@ -35,6 +35,21 @@ KIP_DIR=/path/to/kip ./capture-kip.sh
 
 This reuses the Docker SK Image server, builds and serves the KIP app, and drives it with Playwright to write `../docs/images/kip-widget-config.webp`. See [`../docs/developers/screenshots.md`](../docs/developers/screenshots.md) for how it works.
 
+## Authorization matrix (secured server)
+
+A separate, API-only Playwright spec (`auth/authz-matrix.spec.ts`) pins how the plugin's REST API behaves when the Signal K server has **security enabled**. The fact it documents: signalk-server admin-gates **all** `/plugins/*` routes, so `/plugins/sk-image/*` is **admin-only** under security — read-write, read-only, and anonymous requests all get `401` from the server before the plugin's router runs.
+
+It runs against the `signalk-secured` compose service (security on, three baked test users — `admin`/`adminpw` (admin), `writer`/`writerpw` (readwrite), `reader`/`readerpw` (readonly) — and `allow_readonly` on to show it makes no difference):
+
+```bash
+cd e2e
+docker compose up -d --build signalk-secured        # secured server on :3008
+SIGNALK_SECURED_URL=http://localhost:3008 npm run authz
+docker compose down
+```
+
+The users, secret key, and strategy live in `signalk-config-secured/` (test-only values). See [`../docs/developers/security-model.md`](../docs/developers/security-model.md) for why the plugin's own in-handler auth is only defense-in-depth given this server behavior.
+
 ## What it does
 
 `capture.sh` runs these steps in order:

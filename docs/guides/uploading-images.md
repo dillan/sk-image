@@ -8,9 +8,9 @@ Every picture in your shared boat library starts with an upload. You add images 
 
 Open the web app at `/sk-image` and go to **Library**. Then:
 
-1. Select **Upload**.
-2. Pick a file from your device.
-3. Watch the progress bar. When it fills, the image appears in the library.
+1. Select **Upload**, or **drag files straight onto the Library** and drop them.
+2. Pick **one or more** files from your device.
+3. Watch the progress panel — it shows overall percent, transfer speed, and estimated time remaining, with a per-file list beneath. Each image appears in the library as it finishes; if one file fails (for example it's too large), the rest keep going and the failed one is flagged.
 
 <p align="center"><img src="../images/library.webp" alt="The Library view with the Upload button and a grid of image thumbnails." width="85%"></p>
 

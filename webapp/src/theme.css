@@ -407,6 +407,68 @@ body {
   transition: width 0.2s ease;
 }
 
+/* --- uploads ---------------------------------------------------------------------------------- */
+.uploads__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.uploads__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.uploads__list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.uploads__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.uploads__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uploads__file-status {
+  flex-shrink: 0;
+}
+
+/* --- drag-and-drop ---------------------------------------------------------------------------- */
+.library {
+  position: relative;
+  min-height: 60vh;
+}
+.dropzone {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  background: rgba(13, 17, 23, 0.82);
+  pointer-events: none;
+}
+.dropzone__inner {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent-bright);
+}
+
 /* --- collections list ------------------------------------------------------------------------- */
 .row {
   display: flex;

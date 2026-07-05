@@ -1,3 +1,4 @@
+import type { ResourceProvider } from '@signalk/server-api';
 import type { ImageMeta } from './image-store';
 import { SIGNALK_V1_IMAGE_BASE } from './image-router';
 
@@ -56,15 +57,7 @@ function resolveProperty(doc: Record<string, unknown>, property: string): unknow
   }, doc);
 }
 
-export function createImageResourceProvider(deps: ImageResourceDeps): {
-  type: string;
-  methods: {
-    listResources(query: Record<string, unknown>): Promise<Record<string, unknown>>;
-    getResource(id: string, property?: string): Promise<object>;
-    setResource(id: string, value: Record<string, unknown>): Promise<void>;
-    deleteResource(id: string): Promise<void>;
-  };
-} {
+export function createImageResourceProvider(deps: ImageResourceDeps): ResourceProvider {
   return {
     type: 'images',
     methods: {

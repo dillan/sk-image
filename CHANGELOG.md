@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/dillan/sk-image/compare/v1.1.0...v1.2.0) (2026-07-05)
+
+
+### Features
+
+* multi-file image upload with progress and drag-and-drop ([8c02191](https://github.com/dillan/sk-image/commit/8c021911aa044d55fb372cc980d0611786f86b91))
+
 # [1.1.0](https://github.com/dillan/sk-image/compare/v1.0.0...v1.1.0) (2026-07-04)
 
 

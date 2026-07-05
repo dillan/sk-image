@@ -11,8 +11,8 @@ function okResponse(status: number, json: unknown): Response {
 
 describe('api', () => {
   it('builds variant URLs at a snapped width', () => {
-    expect(api.imageUrl('abc', 320)).toBe('/plugins/sk-image/images/abc?w=320');
-    expect(api.imageUrl('a b', 640)).toBe('/plugins/sk-image/images/a%20b?w=640');
+    expect(api.imageUrl('abc', 320)).toBe('/signalk/v1/api/sk-image/images/abc?w=320');
+    expect(api.imageUrl('a b', 640)).toBe('/signalk/v1/api/sk-image/images/a%20b?w=640');
   });
 
   it('list builds a query string from sort/order/collection and sends the cookie', async () => {
@@ -22,7 +22,7 @@ describe('api', () => {
     vi.stubGlobal('fetch', fetchMock);
     await api.list({ sort: 'name', order: 'asc', collection: 'c1' });
     expect(fetchMock).toHaveBeenCalledWith(
-      '/plugins/sk-image/images?sort=name&order=asc&collection=c1',
+      '/signalk/v1/api/sk-image/images?sort=name&order=asc&collection=c1',
       expect.objectContaining({ credentials: 'include' }),
     );
   });
@@ -33,7 +33,7 @@ describe('api', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     await api.list();
-    expect(fetchMock.mock.calls[0][0]).toBe('/plugins/sk-image/images');
+    expect(fetchMock.mock.calls[0][0]).toBe('/signalk/v1/api/sk-image/images');
   });
 
   it('createCollection POSTs JSON', async () => {
@@ -44,7 +44,7 @@ describe('api', () => {
     const created = await api.createCollection('Deck');
     expect(created.id).toBe('x');
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/plugins/sk-image/collections');
+    expect(url).toBe('/signalk/v1/api/sk-image/collections');
     expect(init?.method).toBe('POST');
     expect(init?.body).toBe(JSON.stringify({ name: 'Deck' }));
   });

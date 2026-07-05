@@ -4,7 +4,7 @@ A terse map of this repo for AI agents and new contributors.
 
 ## What this is
 
-A Signal K server plugin (CommonJS, TypeScript) that stores and serves a vessel image library: secure upload + content validation, on-demand resize/re-encode to WebP, a size-capped on-disk cache, and a REST API under `/plugins/sk-image`. Image bytes live on disk; metadata lives in an SQLite database (`node:sqlite`) beside them.
+A Signal K server plugin (CommonJS, TypeScript) that stores and serves a vessel image library: secure upload + content validation, on-demand resize/re-encode to WebP, a size-capped on-disk cache, and a REST API served on two mounts — `/signalk/v1/api/sk-image` (crew-reachable) and `/plugins/sk-image` (admin-only alias under security) — plus a v2 `images` resource type. Image bytes live on disk; metadata lives in an SQLite database (`node:sqlite`) beside them.
 
 ## Commands
 
@@ -19,8 +19,9 @@ npm run format         # prettier --write .
 
 ## Source layout
 
-- `src/index.ts` — plugin entry (`export = (app) => Plugin`): id/name/schema, lazy store + worker pool, `registerWithRouter`.
-- `src/images/image-router.ts` — Express routes + auth gate + the `/config` capabilities endpoint.
+- `src/index.ts` — plugin entry (`export = (app) => Plugin`): id/name/schema, lazy store + worker pool, both route mounts (`registerWithRouter` + `signalKApiRoutes`), and the v2 resource-provider registration.
+- `src/images/image-router.ts` — Express routes + auth gate + the `/config` capabilities endpoint. Takes a `basePath` so the same routes serve both mounts.
+- `src/images/image-resources.ts` — the read-only v2 `images` resource provider (metadata projection; no GPS, no writes).
 - `src/images/image-store.ts` — validation, storage, on-demand serving, cache stats/purge. No Express.
 - `src/images/metadata-store.ts` — SQLite metadata layer (isolated so the driver is swappable).
 - `src/images/image-processing.ts` — pure convert/resize (sharp + heic-convert), width allow-list.
@@ -42,4 +43,4 @@ npm run format         # prettier --write .
 - Raster originals are **never** served raw — always re-encoded to WebP on the way out.
 - SVGs are **sanitized** (DOMPurify) on ingest; scripts/event handlers/external refs are stripped.
 - On-disk names are generated UUIDs; the client filename is stored only as display metadata, never used to build a path.
-- Upload / delete / cache-purge require **read-write or admin permission** (via `isAuthorizedWriter` in `src/images/sk-request.ts`) — an authenticated read-only principal is rejected. **But** signalk-server admin-gates all `/plugins/*` routes when security is on, so only **admin** principals reach the plugin at all (non-admins get 401 from the server first). The in-handler check is defense-in-depth for the unsecured case; with security on, the plugin is effectively **admin-only**.
+- Upload / delete / cache-purge require **read-write or admin permission** (via `isAuthorizedWriter` in `src/images/sk-request.ts`) when server security is on — an authenticated read-only principal is rejected. On the crew-reachable `/signalk/v1/api/sk-image` mount the server adds no write middleware, so this in-handler check is the only write gate (on `/plugins/sk-image` the server also admin-gates the whole mount). The v2 resource provider has no request principal, so it is read-only and never exposes GPS.

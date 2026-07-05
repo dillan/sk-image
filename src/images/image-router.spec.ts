@@ -116,6 +116,32 @@ const asReq = (r: object): SkReq => r as unknown as SkReq;
 /** A logged-in read-write principal — the shape SK attaches for an authorized writer. */
 const AUTH = { skPrincipal: { identifier: 'u1', permissions: 'readwrite' } };
 
+test('basePath prefixes every route so the /signalk/v1/api mount does not collide', () => {
+  const store = trackStore(join(TMP_ROOT, randomUUID()));
+  const router = createRouterMock();
+  registerImageRoutes(router as unknown as IRouter, { resolveStore: () => store }, '/sk-image');
+  // All routes live under the mount prefix (the shared /signalk/v1/api namespace is host to every
+  // plugin, so an un-prefixed "/config" or "/images" would clash).
+  expect(router.getHandlers.has('/sk-image/config')).toBe(true);
+  expect(router.getHandlers.has('/sk-image/images')).toBe(true);
+  expect(router.getHandlers.has('/sk-image/images/:id')).toBe(true);
+  expect(router.getHandlers.has('/sk-image/images/:id/exif')).toBe(true);
+  expect(router.postHandlers.has('/sk-image/images')).toBe(true);
+  expect(router.deleteHandlers.has('/sk-image/images/:id')).toBe(true);
+  expect(router.getHandlers.has('/sk-image/collections')).toBe(true);
+  // …and nothing is left at the un-prefixed root.
+  expect(router.getHandlers.has('/config')).toBe(false);
+  expect(router.getHandlers.has('/images')).toBe(false);
+});
+
+test('default (empty) basePath keeps the /plugins/sk-image routes unprefixed', () => {
+  const store = trackStore(join(TMP_ROOT, randomUUID()));
+  const router = createRouterMock();
+  registerImageRoutes(router as unknown as IRouter, { resolveStore: () => store });
+  expect(router.getHandlers.has('/config')).toBe(true);
+  expect(router.postHandlers.has('/images')).toBe(true);
+});
+
 afterAll(() => {
   for (const s of opened) {
     try {
@@ -220,7 +246,7 @@ test('canReadSensitiveMetadata: open when unsecured or logged in; blocked for se
   ).toBe(false);
 });
 
-test('GET /images hides capture GPS from a secured anonymous client but keeps it for a logged-in user', async () => {
+test('GET /images hides capture GPS and the uploader from a secured anonymous client but keeps them for a logged-in user', async () => {
   const stub = {
     list: async () => [
       {
@@ -234,6 +260,7 @@ test('GET /images hides capture GPS from a secured anonymous client but keeps it
         createdAt: 't',
         lat: 12.3,
         lon: 45.6,
+        uploadedBy: 'skipper',
       },
     ],
   };
@@ -242,12 +269,15 @@ test('GET /images hides capture GPS from a secured anonymous client but keeps it
     resolveStore: () => stub as unknown as ImageStore,
   });
 
+  type Item = { lat: number | null; lon: number | null; uploadedBy: string | null };
   const anon = createResMock();
   router.getHandlers.get('/images')!({ skIsAuthenticated: false }, anon);
   await anon.done;
-  const anonItems = anon.jsonBody as { lat: number | null; lon: number | null }[];
+  const anonItems = anon.jsonBody as Item[];
   expect(anonItems[0].lat).toBeNull();
   expect(anonItems[0].lon).toBeNull();
+  // The uploader's username is an audit field; a secured anonymous visitor must not see it.
+  expect(anonItems[0].uploadedBy).toBeNull();
 
   const user = createResMock();
   router.getHandlers.get('/images')!(
@@ -255,9 +285,10 @@ test('GET /images hides capture GPS from a secured anonymous client but keeps it
     user,
   );
   await user.done;
-  const userItems = user.jsonBody as { lat: number | null; lon: number | null }[];
+  const userItems = user.jsonBody as Item[];
   expect(userItems[0].lat).toBe(12.3);
   expect(userItems[0].lon).toBe(45.6);
+  expect(userItems[0].uploadedBy).toBe('skipper');
 });
 
 test('GET /images/:id/exif requires a logged-in user on a secured server', async () => {

@@ -13,7 +13,7 @@ When the cache would exceed this size, the least-recently-used variants are evic
 
 ## Purging the cache
 
-You can clear all generated variants at any time (from the admin UI, the KIP settings card, or `DELETE /plugins/sk-image/images/cache`). This frees disk immediately; variants regenerate the next time an image is requested. Your original uploads are never affected.
+You can clear all generated variants at any time (from the admin UI, the KIP settings card, or `DELETE /signalk/v1/api/sk-image/images/cache`). This frees disk immediately; variants regenerate the next time an image is requested. Your original uploads are never affected.
 
 ## Storage location
 

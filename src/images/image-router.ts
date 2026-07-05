@@ -11,6 +11,16 @@ import {
 
 const ID_RE = /^[A-Za-z0-9-]+$/;
 
+/**
+ * Namespace under which the image API is mounted on the server's shared `/signalk/v1/api` router
+ * (via the plugin's `signalKApiRoutes` hook). Unlike `/plugins/sk-image`, this path is NOT
+ * admin-gated on a secured server, so ordinary crew can reach it — the plugin's own auth
+ * (`isAuthorizedWriter` / `canReadSensitiveMetadata`) is the effective gate there.
+ */
+export const SK_IMAGE_MOUNT = '/sk-image';
+/** Absolute, from-root base for the crew-reachable image API (used to build byte URLs). */
+export const SIGNALK_V1_IMAGE_BASE = `/signalk/v1/api${SK_IMAGE_MOUNT}`;
+
 function sendJson(res: Response, status: number, body: unknown): void {
   res.status(status).json(body);
 }
@@ -18,9 +28,15 @@ function sendError(res: Response, status: number, message: string): void {
   res.status(status).json({ error: message });
 }
 
-/** Remove capture GPS from image metadata for clients not allowed to see the location. */
-function stripLocation<T extends { lat?: number | null; lon?: number | null }>(meta: T): T {
-  return { ...meta, lat: null, lon: null };
+/**
+ * Remove per-user-sensitive fields from image metadata for clients not allowed to see them:
+ * capture GPS (where the photo was taken) and the uploader's username (an audit field). Applied to
+ * anonymous callers on a secured server; logged-in users get the full record.
+ */
+function stripSensitive<
+  T extends { lat?: number | null; lon?: number | null; uploadedBy?: string | null },
+>(meta: T): T {
+  return { ...meta, lat: null, lon: null, uploadedBy: null };
 }
 
 /** Normalize a client-supplied collection name (trim, strip control chars, cap length). */
@@ -42,8 +58,17 @@ export interface ImageRouterDeps {
   getConfig?: () => unknown;
 }
 
-/** Register the image-asset routes on the plugin's Express router (mounted at /plugins/sk-image). */
-export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): void {
+/**
+ * Register the image-asset routes on an Express router.
+ *
+ * The same routes are published on two mounts: the server's per-plugin router at
+ * `/plugins/sk-image` (admin-gated under security — a backward-compatible alias) and, with
+ * `basePath = '/sk-image'`, the shared `/signalk/v1/api` router where ordinary crew can reach them.
+ * `basePath` prefixes every route so the routes never collide in the shared `/signalk/v1/api`
+ * namespace; it is empty for the per-plugin mount.
+ */
+export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, basePath = ''): void {
+  const p = (route: string): string => `${basePath}${route}`;
   const isAuth = deps.isAuthenticated ?? isAuthorizedWriter;
   // Enforce write access, choosing the status that gives the client the right next step:
   //  - 401 for an anonymous request (the web app prompts a login),
@@ -70,12 +95,12 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
 
   // GET /config — capabilities discovery (width allow-list + limits). Clients read this instead of
   // hard-coding a mirrored copy of the server's constants. Read-only, no auth required.
-  router.get('/config', (_req: Request, res: Response) => {
+  router.get(p('/config'), (_req: Request, res: Response) => {
     res.json(deps.getConfig ? deps.getConfig() : {});
   });
 
   // POST /images — upload (auth required; auth is checked BEFORE multipart parsing).
-  router.post('/images', (req: Request, res: Response) => {
+  router.post(p('/images'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'upload images')) return;
     single(req, res, (err: unknown) => {
       void (async () => {
@@ -107,7 +132,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // GET /images?sort=name|date&order=asc|desc&collection=<id> — list the library.
-  router.get('/images', (req: Request, res: Response) => {
+  router.get(p('/images'), (req: Request, res: Response) => {
     const store = getStore(res);
     if (!store) return;
     const query = (req.query ?? {}) as { sort?: unknown; order?: unknown; collection?: unknown };
@@ -118,8 +143,9 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
     void (async () => {
       try {
         const items = await store.list({ sort, order, collection });
-        // Capture GPS is only shown to logged-in users (open on an unsecured server).
-        res.json(canReadSensitiveMetadata(req as SkRequest) ? items : items.map(stripLocation));
+        // Capture GPS and the uploader's username are only shown to logged-in users (open on an
+        // unsecured server); a secured anonymous visitor gets them nulled.
+        res.json(canReadSensitiveMetadata(req as SkRequest) ? items : items.map(stripSensitive));
       } catch {
         sendError(res, 500, 'Failed to list images');
       }
@@ -127,7 +153,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // Cache routes MUST be registered before /images/:id so "cache" is not matched as an id.
-  router.get('/images/cache', (_req: Request, res: Response) => {
+  router.get(p('/images/cache'), (_req: Request, res: Response) => {
     const store = getStore(res);
     if (!store) return;
     void (async () => {
@@ -139,7 +165,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
     })();
   });
 
-  router.delete('/images/cache', (req: Request, res: Response) => {
+  router.delete(p('/images/cache'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'purge the image cache')) return;
     const store = getStore(res);
     if (!store) return;
@@ -154,7 +180,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // GET /images/:id?w= — serve a variant (raster re-encoded to WebP) or sanitized SVG.
-  router.get('/images/:id', (req: Request, res: Response) => {
+  router.get(p('/images/:id'), (req: Request, res: Response) => {
     const id = String(req.params.id ?? '');
     if (!ID_RE.test(id)) return sendError(res, 400, 'Invalid image id');
     const rawW = req.query.w;
@@ -175,7 +201,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // DELETE /images/:id — remove an image (auth required).
-  router.delete('/images/:id', (req: Request, res: Response) => {
+  router.delete(p('/images/:id'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'delete images')) return;
     const id = String(req.params.id ?? '');
     if (!ID_RE.test(id)) return sendError(res, 400, 'Invalid image id');
@@ -193,7 +219,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // GET /images/:id/exif — full raw EXIF for one image (null when none was captured).
-  router.get('/images/:id/exif', (req: Request, res: Response) => {
+  router.get(p('/images/:id/exif'), (req: Request, res: Response) => {
     // Raw EXIF can carry capture GPS; only logged-in users may read it (open on an unsecured server).
     if (!canReadSensitiveMetadata(req as SkRequest)) {
       return sendError(res, 401, 'Login required to view image EXIF');
@@ -216,7 +242,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   // --- collections ------------------------------------------------------------------------------
 
   // GET /collections — list collections with image counts.
-  router.get('/collections', (_req: Request, res: Response) => {
+  router.get(p('/collections'), (_req: Request, res: Response) => {
     const store = getStore(res);
     if (!store) return;
     try {
@@ -227,7 +253,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // POST /collections { name } — create a collection (auth required).
-  router.post('/collections', (req: Request, res: Response) => {
+  router.post(p('/collections'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'create a collection')) return;
     const name = sanitizeName((req.body as { name?: unknown } | undefined)?.name);
     if (!name) return sendError(res, 400, 'A collection name is required');
@@ -241,7 +267,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // PUT /collections/:id { name } — rename a collection (auth required).
-  router.put('/collections/:id', (req: Request, res: Response) => {
+  router.put(p('/collections/:id'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'rename a collection')) return;
     const id = String(req.params.id ?? '');
     if (!ID_RE.test(id)) return sendError(res, 400, 'Invalid collection id');
@@ -258,7 +284,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // DELETE /collections/:id — delete a collection (auth required). The images themselves are kept.
-  router.delete('/collections/:id', (req: Request, res: Response) => {
+  router.delete(p('/collections/:id'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'delete a collection')) return;
     const id = String(req.params.id ?? '');
     if (!ID_RE.test(id)) return sendError(res, 400, 'Invalid collection id');
@@ -273,7 +299,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // POST /collections/:id/images/:imageId — add an image to a collection (auth required).
-  router.post('/collections/:id/images/:imageId', (req: Request, res: Response) => {
+  router.post(p('/collections/:id/images/:imageId'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'modify a collection')) return;
     const id = String(req.params.id ?? '');
     const imageId = String(req.params.imageId ?? '');
@@ -291,7 +317,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps): voi
   });
 
   // DELETE /collections/:id/images/:imageId — remove an image from a collection (auth required).
-  router.delete('/collections/:id/images/:imageId', (req: Request, res: Response) => {
+  router.delete(p('/collections/:id/images/:imageId'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'modify a collection')) return;
     const id = String(req.params.id ?? '');
     const imageId = String(req.params.imageId ?? '');

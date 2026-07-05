@@ -41,14 +41,16 @@ export function canReadSensitiveMetadata(req: SkRequest): boolean {
 /**
  * True when the request may perform a write (upload / delete / mutate collections).
  *
- * Reachability note: when server security is enabled, signalk-server fronts ALL `/plugins/*` routes
- * with an admin-only guard (`app.use('/plugins', adminAuthenticationMiddleware)` in tokensecurity),
- * so only an `admin` principal ever reaches this plugin — read-write, read-only, and anonymous
- * requests all get 401 from the server first. This in-handler check is therefore defense-in-depth:
- * the effective gate only on an UNSECURED server (no `/plugins` middleware), and a redundant belt on
- * a secured one (where only admins arrive, and admins always have write permission). It mirrors the
- * server's write rule regardless — a write needs read-write or admin permission; an authenticated
- * read-only principal (including the anonymous `AUTO`/readonly one) is rejected.
+ * Reachability note: the plugin publishes its routes on two mounts (see `image-router.ts`).
+ *   - `/signalk/v1/api/sk-image` (via `signalKApiRoutes`) is NOT admin-gated, so read-write,
+ *     read-only, and anonymous requests all reach this plugin. The server adds no write middleware
+ *     there, so this in-handler check is the EFFECTIVE write gate on that mount — the one crew and
+ *     the web app use.
+ *   - `/plugins/sk-image` (via `registerWithRouter`) is fronted by signalk-server's admin-only guard
+ *     (`app.use('/plugins', adminAuthenticationMiddleware)` in tokensecurity) when security is on, so
+ *     only an `admin` reaches it and this check is a redundant belt there.
+ * Either way it mirrors the server's write rule — a write needs read-write or admin permission; an
+ * authenticated read-only principal (including the anonymous `AUTO`/readonly one) is rejected.
  */
 export function isAuthorizedWriter(req: SkRequest): boolean {
   // Fail open only when no security strategy is active at all (both signals unset). A secured

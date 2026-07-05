@@ -31,19 +31,19 @@ npm install sk-image
 
 ## How to use it
 
-Once enabled, the plugin serves its API under `/plugins/sk-image`:
+Once enabled, the plugin serves its API under `/signalk/v1/api/sk-image` (reachable by ordinary crew on a secured server; a `/plugins/sk-image` alias also exists but is admin-only under security):
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/plugins/sk-image/config` | Capabilities (supported widths, size limits) |
-| `POST` | `/plugins/sk-image/images` | Upload an image (login required) |
-| `GET` | `/plugins/sk-image/images` | List the library |
-| `GET` | `/plugins/sk-image/images/:id?w=<width>` | Serve a resized WebP variant (or sanitized SVG) |
-| `DELETE` | `/plugins/sk-image/images/:id` | Delete an image (login required) |
-| `GET` | `/plugins/sk-image/images/cache` | Cache size + file count |
-| `DELETE` | `/plugins/sk-image/images/cache` | Purge generated variants (login required) |
+| `GET` | `/signalk/v1/api/sk-image/config` | Capabilities (supported widths, size limits) |
+| `POST` | `/signalk/v1/api/sk-image/images` | Upload an image (write access required) |
+| `GET` | `/signalk/v1/api/sk-image/images` | List the library |
+| `GET` | `/signalk/v1/api/sk-image/images/:id?w=<width>` | Serve a resized WebP variant (or sanitized SVG) |
+| `DELETE` | `/signalk/v1/api/sk-image/images/:id` | Delete an image (write access required) |
+| `GET` | `/signalk/v1/api/sk-image/images/cache` | Cache size + file count |
+| `DELETE` | `/signalk/v1/api/sk-image/images/cache` | Purge generated variants (write access required) |
 
-See [`docs/reference/http-api.md`](docs/reference/http-api.md) for details.
+Image metadata is also published as the v2 `images` resource type at `/signalk/v2/api/resources/images` (read-only, no GPS). See [`docs/reference/http-api.md`](docs/reference/http-api.md) for details.
 
 ## Good to know
 

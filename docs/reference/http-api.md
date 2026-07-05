@@ -1,8 +1,15 @@
 # HTTP API
 
-All routes are served by the Signal K server under `/plugins/sk-image`.
+**Base path.** The routes below are published on two mounts:
 
-> **Security note.** When the Signal K server has security enabled, it restricts **every** `/plugins/*` route — including all of these — to **admin** users. A non-admin request (read-write, read-only, or anonymous) gets `401` from the server _before_ it reaches this plugin, so with security on **only an admin can use the API at all**. On an **unsecured** server everything is open, and the plugin's own rules below apply: read routes are open (capture GPS/EXIF is limited to logged-in users), and the mutating routes (upload, delete, cache purge, collection edits) require write access.
+- **`/signalk/v1/api/sk-image`** — the primary mount (what the web app uses). It is _not_ admin-gated, so on a secured server ordinary crew can reach it: read-only accounts can browse, read-write accounts can manage.
+- **`/plugins/sk-image`** — a backward-compatible alias. On a secured server the Signal K server admin-gates every `/plugins/*` route, so this mount is **admin only**. Prefer the `/signalk/v1/api/sk-image` path.
+
+The paths in each section below are relative to whichever base you use.
+
+When server security is enabled, the mutating routes (upload, delete, cache purge, collection edits) require **write access** — a read-write or admin principal. A denied write returns `401` for an anonymous request (log in) or `403` for a logged-in read-only account (your account lacks write access). Read routes are available to any client that can read Signal K data.
+
+Image metadata is additionally published as a v2 resource type — see [Resource API](#resource-api-v2) at the bottom.
 
 ## `GET /config`
 
@@ -35,7 +42,7 @@ List the library — an array of image metadata. Optional query parameters:
 - `order` — `asc` or `desc`. Default: `asc`.
 - `collection` — a collection id to list only that collection's images.
 
-Each item includes EXIF-derived fields when present: `captureDate`, `lat`, `lon`, `cameraMake`, `cameraModel`, `orientation`. On a secured server, capture GPS (`lat`/`lon`) is omitted for anonymous/read-only clients — only logged-in users see it. (On an unsecured server everything is returned.)
+Each item includes EXIF-derived fields when present: `captureDate`, `lat`, `lon`, `cameraMake`, `cameraModel`, `orientation`, and the audit field `uploadedBy`. On a secured server, capture GPS (`lat`/`lon`) and the uploader's username (`uploadedBy`) are omitted for anonymous clients — only logged-in users see them. (On an unsecured server everything is returned.)
 
 ## `GET /images/:id?w=<width>`
 
@@ -72,6 +79,17 @@ Group images into named collections (an image can be in many). All mutations req
 
 Filter the library to a collection with `GET /images?collection=<id>`.
 
+## Resource API (v2)
+
+Image metadata is also exposed as the custom **`images`** resource type, so it shows up in the Signal K admin UI's resource browser and is discoverable by generic v2 clients:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/signalk/v2/api/resources/images` | List image metadata keyed by id; each doc carries a `url` to fetch the bytes |
+| `GET` | `/signalk/v2/api/resources/images/:id` | One image's metadata |
+
+This layer is **read-only** (uploads and deletes go through `POST`/`DELETE /images`) and — because a resource provider has no request principal to authorize against — it **never** includes capture GPS (`lat`/`lon`) or the uploader (`uploadedBy`) for anyone. Each doc's `url` points at `/signalk/v1/api/sk-image/images/:id`. To read capture location or raw EXIF, use the REST routes above as a logged-in user.
+
 ## Web app
 
-The plugin ships a web-app image library, served by the Signal K server at `/sk-image`, that uses these endpoints. It authenticates with the Signal K session cookie.
+The plugin ships a web-app image library, served by the Signal K server at `/sk-image`, that uses the `/signalk/v1/api/sk-image` endpoints. It authenticates with the Signal K session cookie, so on a secured server the same crew who can read Signal K data can browse the library, and read-write crew can manage it.

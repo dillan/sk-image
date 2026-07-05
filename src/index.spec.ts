@@ -101,3 +101,32 @@ test('statusMessage reports readiness before the store is built', () => {
   expect(typeof plugin.statusMessage).toBe('function');
   expect(plugin.statusMessage?.()).toBe('Ready');
 });
+
+test('signalKApiRoutes publishes the API under the crew-reachable /sk-image mount', () => {
+  const plugin = skImagePlugin(createAppMock(TMP));
+  expect(typeof plugin.signalKApiRoutes).toBe('function');
+  const router = createRouterMock();
+  const returned = plugin.signalKApiRoutes?.(router as unknown as IRouter);
+  // Must return the router (the server mounts the returned value) and namespace under /sk-image.
+  expect(returned).toBe(router);
+  expect(router.getHandlers.has('/sk-image/config')).toBe(true);
+  expect(router.getHandlers.has('/config')).toBe(false);
+});
+
+test('start() registers the v2 images resource provider when the server supports it', () => {
+  const registered: Array<{ type: string }> = [];
+  const app = {
+    ...createAppMock(TMP),
+    registerResourceProvider: (p: { type: string }) => registered.push(p),
+  } as unknown as ServerAPI;
+  const plugin = skImagePlugin(app);
+  plugin.start?.({}, () => {});
+  plugin.start?.({}, () => {}); // idempotent — a second start must not double-register.
+  expect(registered).toHaveLength(1);
+  expect(registered[0].type).toBe('images');
+});
+
+test('start() tolerates a server without the resource API (older servers)', () => {
+  const plugin = skImagePlugin(createAppMock(TMP)); // mock has no registerResourceProvider
+  expect(() => plugin.start?.({}, () => {})).not.toThrow();
+});

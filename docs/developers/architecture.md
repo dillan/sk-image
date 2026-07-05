@@ -24,8 +24,8 @@ flowchart LR
     end
   end
   Disk[("Data dir<br/>originals/ · cache/ · metadata.db")]
-  Webapp -- "HTTPS /plugins/sk-image/*" --> Router
-  KIP -- "HTTPS /plugins/sk-image/*" --> Router
+  Webapp -- "HTTPS /signalk/v1/api/sk-image/*" --> Router
+  KIP -- "HTTPS /signalk/v1/api/sk-image/* (or /plugins alias)" --> Router
   Router --> Store
   Store --> Meta
   Store --> Pool
@@ -42,7 +42,9 @@ A few things are load-bearing once you can see the diagram:
 
 - **Bytes live on disk; facts about them live in SQLite.** The image data — originals and generated WebP variants — sits in the data dir under `originals/` and `cache/`. Everything you'd want to _query_ (id, filename, dimensions, capture date, GPS, camera make/model, collection membership) lives in `metadata.db` via `MetadataStore`. That split is why the database is disposable: it's a derived index over the originals, so a lost or corrupt `metadata.db` is quarantined and replaced with a fresh index on the next start rather than taking routes offline, and the originals are never at risk from a database problem.
 
-- **The web app and the KIP widget are just HTTP clients.** Neither is special. They both talk to the same REST surface under `/plugins/sk-image/*`, authenticate with the same Signal K session, and get the same WebP bytes back. The plugin has no idea which one is calling. If you can do it in the web app, you can do it with `curl`.
+- **The web app and the KIP widget are just HTTP clients.** Neither is special. They both talk to the same REST route table, authenticate with the same Signal K session, and get the same WebP bytes back. The plugin has no idea which one is calling. If you can do it in the web app, you can do it with `curl`.
+
+- **The same routes are published on two mounts.** `registerImageRoutes` takes a `basePath`, so the route table is mounted twice: at `/signalk/v1/api/sk-image` (via `signalKApiRoutes`) and at `/plugins/sk-image` (via `registerWithRouter`). The first is _not_ admin-gated by a secured server, so ordinary crew can reach the library there — the second is a backward-compatible alias that a secured server admin-gates. The web app targets the crew-reachable path. A third, read-only projection of the metadata is published as the v2 `images` resource type (`image-resources.ts`). See [Security model → access model](security-model.md#access-model--the-three-mounts).
 
 - **The worker pool keeps the server thread responsive.** Decoding a HEIC, resizing a 12-megapixel photo, and re-encoding it to WebP is CPU-heavy. `ImageStore` hands that work to a pool of worker threads (`sharp`, plus `heic-convert` for HEIC/HEIF) instead of blocking the Node event loop, so serving one large image doesn't stall every other Signal K request. Results are written to the on-disk cache so the expensive work happens once per `(image, width)` pair.
 

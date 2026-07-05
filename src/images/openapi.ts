@@ -1,9 +1,12 @@
 /**
- * OpenAPI definition for the image API served under `/plugins/sk-image`.
+ * OpenAPI definition for the image REST API.
  *
  * The plugin returns this from `Plugin.getOpenApi()` so the Signal K admin UI lists it under
  * Documentation -> OpenAPI, the same way the server's own v2 APIs are described. Paths are relative
- * to the plugin mount (declared via `servers`). It is a static document — there is no runtime state.
+ * to the mounts declared via `servers`: the crew-reachable `/signalk/v1/api/sk-image` (not
+ * admin-gated) and the backward-compatible `/plugins/sk-image` alias (admin-only under security).
+ * Image metadata is additionally discoverable as the v2 `images` resource type at
+ * `/signalk/v2/api/resources/images`. It is a static document — there is no runtime state.
  */
 
 // Reused pieces so the many routes stay consistent and readable.
@@ -39,7 +42,7 @@ const idParam = (name: string) => ({
   schema: { type: 'string', pattern: '^[A-Za-z0-9-]+$' },
 });
 
-/** The OpenAPI 3.0.3 description of the `/plugins/sk-image` HTTP API. */
+/** The OpenAPI 3.0.3 description of the SK Image HTTP API. */
 export function imageOpenApi(): object {
   return {
     openapi: '3.0.3',
@@ -52,7 +55,16 @@ export function imageOpenApi(): object {
         'size-capped disk cache, EXIF, and collections. Read routes are open; writes require a ' +
         'read-write or admin principal.',
     },
-    servers: [{ url: '/plugins/sk-image' }],
+    servers: [
+      {
+        url: '/signalk/v1/api/sk-image',
+        description: 'Crew-reachable mount — not admin-gated, so the plugin’s own auth applies.',
+      },
+      {
+        url: '/plugins/sk-image',
+        description: 'Backward-compatible alias — admin-only on a secured server.',
+      },
+    ],
     components: {
       securitySchemes: {
         // Signal K authenticates browser clients with a session cookie.

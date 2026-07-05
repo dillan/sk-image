@@ -8,6 +8,7 @@
     "pretest": "playwright install chromium",
     "seed": "node seed.mjs",
     "screenshots": "playwright test --config=screenshots.config.ts",
+    "authz": "playwright test --config=authz.config.ts",
     "webp": "node scripts/to-webp.mjs"
   },
   "devDependencies": {

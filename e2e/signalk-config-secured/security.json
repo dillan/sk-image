@@ -1,0 +1,26 @@
+{
+  "allow_readonly": true,
+  "allowNewUserRegistration": false,
+  "allowDeviceAccessRequests": false,
+  "expiration": "NEVER",
+  "secretKey": "4f500fdcb9242971b7ffbee6dbb8df7879138e343e66f90eed4eb7748eaa066a4f4b82078bde7b5af96a3eaaad99df5b58c13c61cc06bdf7684d9b42037b1219",
+  "users": [
+    {
+      "username": "admin",
+      "type": "admin",
+      "password": "$2a$10$jhfC1zUOmNFIXcv.ECR.s.WEXiboRCXaavPplSAX5MWimduFmcwWa"
+    },
+    {
+      "username": "writer",
+      "type": "readwrite",
+      "password": "$2a$10$7Ndl5Ce65ALrEBX0COmf9.1hPCEUf7VRIyxBWEyteBev2Ga5mSvsG"
+    },
+    {
+      "username": "reader",
+      "type": "readonly",
+      "password": "$2a$10$3Qw/WEbLYL3eVGWlN4s4peWMilYE9C6Gs2Np3meoO.BdW95crrIU2"
+    }
+  ],
+  "devices": [],
+  "acls": []
+}

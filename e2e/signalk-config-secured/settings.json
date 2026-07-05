@@ -1,0 +1,12 @@
+{
+  "interfaces": {},
+  "ssl": false,
+  "pipedProviders": [],
+  "vessel": {
+    "name": "Test Vessel",
+    "mmsi": "000000000"
+  },
+  "security": {
+    "strategy": "@signalk/sk-simple-token-security"
+  }
+}

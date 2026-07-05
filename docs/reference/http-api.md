@@ -42,7 +42,7 @@ List the library — an array of image metadata. Optional query parameters:
 - `order` — `asc` or `desc`. Default: `asc`.
 - `collection` — a collection id to list only that collection's images.
 
-Each item includes EXIF-derived fields when present: `captureDate`, `lat`, `lon`, `cameraMake`, `cameraModel`, `orientation`. On a secured server, capture GPS (`lat`/`lon`) is omitted for anonymous/read-only clients — only logged-in users see it. (On an unsecured server everything is returned.)
+Each item includes EXIF-derived fields when present: `captureDate`, `lat`, `lon`, `cameraMake`, `cameraModel`, `orientation`, and the audit field `uploadedBy`. On a secured server, capture GPS (`lat`/`lon`) and the uploader's username (`uploadedBy`) are omitted for anonymous clients — only logged-in users see them. (On an unsecured server everything is returned.)
 
 ## `GET /images/:id?w=<width>`
 
@@ -88,7 +88,7 @@ Image metadata is also exposed as the custom **`images`** resource type, so it s
 | `GET` | `/signalk/v2/api/resources/images` | List image metadata keyed by id; each doc carries a `url` to fetch the bytes |
 | `GET` | `/signalk/v2/api/resources/images/:id` | One image's metadata |
 
-This layer is **read-only** (uploads and deletes go through `POST`/`DELETE /images`) and — because a resource provider has no request principal to authorize against — it **never** includes capture GPS (`lat`/`lon`) for anyone. Each doc's `url` points at `/signalk/v1/api/sk-image/images/:id`. To read capture location or raw EXIF, use the REST routes above as a logged-in user.
+This layer is **read-only** (uploads and deletes go through `POST`/`DELETE /images`) and — because a resource provider has no request principal to authorize against — it **never** includes capture GPS (`lat`/`lon`) or the uploader (`uploadedBy`) for anyone. Each doc's `url` points at `/signalk/v1/api/sk-image/images/:id`. To read capture location or raw EXIF, use the REST routes above as a logged-in user.
 
 ## Web app
 

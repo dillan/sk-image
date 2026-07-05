@@ -76,7 +76,12 @@ test.describe('secured server: the /plugins/sk-image alias is admin-only', () =>
 test.describe('secured server: /signalk/v1/api/sk-image is crew-reachable (plugin auth applies)', () => {
   test('crew can READ the library: anon, reader, and writer all get 200', async ({ request }) => {
     expect((await request.get(`${API}/config`)).status()).toBe(200);
-    expect((await request.get(`${API}/images`)).status()).toBe(200);
+
+    // Anonymous list works, but the uploader's username is withheld (audit field).
+    const anonList = await request.get(`${API}/images`);
+    expect(anonList.status()).toBe(200);
+    const items = (await anonList.json()) as Array<{ uploadedBy?: unknown }>;
+    for (const it of items) expect(it.uploadedBy ?? null).toBeNull();
 
     const reader = await login(request, 'reader', 'readerpw');
     expect((await request.get(`${API}/images`, { headers: bearer(reader) })).status()).toBe(200);
@@ -127,10 +132,11 @@ test.describe('secured server: the v2 images resource type', () => {
     const docs = Object.values(map);
     expect(docs.length).toBeGreaterThan(0);
     for (const doc of docs) {
-      // Byte URL points at the crew-reachable mount; location is never present.
+      // Byte URL points at the crew-reachable mount; sensitive fields are never present.
       expect(String(doc.url)).toContain('/signalk/v1/api/sk-image/images/');
       expect('lat' in doc).toBe(false);
       expect('lon' in doc).toBe(false);
+      expect('uploadedBy' in doc).toBe(false);
     }
   });
 });

@@ -28,9 +28,15 @@ function sendError(res: Response, status: number, message: string): void {
   res.status(status).json({ error: message });
 }
 
-/** Remove capture GPS from image metadata for clients not allowed to see the location. */
-function stripLocation<T extends { lat?: number | null; lon?: number | null }>(meta: T): T {
-  return { ...meta, lat: null, lon: null };
+/**
+ * Remove per-user-sensitive fields from image metadata for clients not allowed to see them:
+ * capture GPS (where the photo was taken) and the uploader's username (an audit field). Applied to
+ * anonymous callers on a secured server; logged-in users get the full record.
+ */
+function stripSensitive<
+  T extends { lat?: number | null; lon?: number | null; uploadedBy?: string | null },
+>(meta: T): T {
+  return { ...meta, lat: null, lon: null, uploadedBy: null };
 }
 
 /** Normalize a client-supplied collection name (trim, strip control chars, cap length). */
@@ -137,8 +143,9 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
     void (async () => {
       try {
         const items = await store.list({ sort, order, collection });
-        // Capture GPS is only shown to logged-in users (open on an unsecured server).
-        res.json(canReadSensitiveMetadata(req as SkRequest) ? items : items.map(stripLocation));
+        // Capture GPS and the uploader's username are only shown to logged-in users (open on an
+        // unsecured server); a secured anonymous visitor gets them nulled.
+        res.json(canReadSensitiveMetadata(req as SkRequest) ? items : items.map(stripSensitive));
       } catch {
         sendError(res, 500, 'Failed to list images');
       }

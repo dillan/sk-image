@@ -36,12 +36,14 @@ const READ_ONLY_MESSAGE =
   'The images resource is read-only; upload or delete via the SK Image API ' +
   `(POST/DELETE ${SIGNALK_V1_IMAGE_BASE}/images/:id).`;
 
-/** Project stored metadata to a resource doc: drop location, add a byte URL + a $source tag. */
+/** Project stored metadata to a resource doc: drop sensitive fields, add a byte URL + a $source tag. */
 function toResourceDoc(meta: ImageMeta): Record<string, unknown> {
   const doc: Record<string, unknown> = { ...meta };
-  // Omit lat/lon entirely — no principal is available to authorize a location read here.
+  // No principal is available here to authorize per-user-sensitive reads, so drop them entirely:
+  // capture location, and the uploader's username (an audit field anonymous clients must not see).
   delete doc.lat;
   delete doc.lon;
+  delete doc.uploadedBy;
   doc.url = `${SIGNALK_V1_IMAGE_BASE}/images/${meta.id}`;
   doc.$source = 'sk-image';
   return doc;

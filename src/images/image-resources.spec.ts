@@ -19,6 +19,7 @@ const WITH_GPS: ImageMeta = {
   cameraMake: 'ACME',
   cameraModel: 'SeaCam 1',
   orientation: 1,
+  uploadedBy: 'skipper',
 };
 const PLAIN: ImageMeta = {
   id: 'plain2',
@@ -51,12 +52,14 @@ test('listResources returns a byte URL and NEVER leaks capture GPS (no principal
   >;
   const doc = map['gps1'];
   expect(doc).toBeDefined();
-  // The v2 resource layer has no request principal, so capture location must never appear.
+  // The v2 resource layer has no request principal, so per-user-sensitive fields must never appear:
+  // capture location, and the uploader's username (an audit field — anonymous clients must not see it).
   expect('lat' in doc).toBe(false);
   expect('lon' in doc).toBe(false);
+  expect('uploadedBy' in doc).toBe(false);
   // A discoverable byte URL points at the crew-reachable /signalk/v1/api mount.
   expect(doc.url).toBe(`${SIGNALK_V1_IMAGE_BASE}/images/gps1`);
-  // Non-location metadata is still exposed (parity with the REST list).
+  // Non-sensitive metadata is still exposed.
   expect(doc.name).toBe('harbour.jpg');
   expect(doc.cameraModel).toBe('SeaCam 1');
 });
@@ -65,6 +68,7 @@ test('getResource returns one stripped doc, and rejects for an unknown id', asyn
   const doc = (await provider().methods.getResource('gps1')) as Record<string, unknown>;
   expect('lat' in doc).toBe(false);
   expect('lon' in doc).toBe(false);
+  expect('uploadedBy' in doc).toBe(false);
   expect(doc.url).toBe(`${SIGNALK_V1_IMAGE_BASE}/images/gps1`);
   await expect(provider().methods.getResource('nope')).rejects.toThrow();
 });

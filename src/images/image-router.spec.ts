@@ -246,7 +246,7 @@ test('canReadSensitiveMetadata: open when unsecured or logged in; blocked for se
   ).toBe(false);
 });
 
-test('GET /images hides capture GPS from a secured anonymous client but keeps it for a logged-in user', async () => {
+test('GET /images hides capture GPS and the uploader from a secured anonymous client but keeps them for a logged-in user', async () => {
   const stub = {
     list: async () => [
       {
@@ -260,6 +260,7 @@ test('GET /images hides capture GPS from a secured anonymous client but keeps it
         createdAt: 't',
         lat: 12.3,
         lon: 45.6,
+        uploadedBy: 'skipper',
       },
     ],
   };
@@ -268,12 +269,15 @@ test('GET /images hides capture GPS from a secured anonymous client but keeps it
     resolveStore: () => stub as unknown as ImageStore,
   });
 
+  type Item = { lat: number | null; lon: number | null; uploadedBy: string | null };
   const anon = createResMock();
   router.getHandlers.get('/images')!({ skIsAuthenticated: false }, anon);
   await anon.done;
-  const anonItems = anon.jsonBody as { lat: number | null; lon: number | null }[];
+  const anonItems = anon.jsonBody as Item[];
   expect(anonItems[0].lat).toBeNull();
   expect(anonItems[0].lon).toBeNull();
+  // The uploader's username is an audit field; a secured anonymous visitor must not see it.
+  expect(anonItems[0].uploadedBy).toBeNull();
 
   const user = createResMock();
   router.getHandlers.get('/images')!(
@@ -281,9 +285,10 @@ test('GET /images hides capture GPS from a secured anonymous client but keeps it
     user,
   );
   await user.done;
-  const userItems = user.jsonBody as { lat: number | null; lon: number | null }[];
+  const userItems = user.jsonBody as Item[];
   expect(userItems[0].lat).toBe(12.3);
   expect(userItems[0].lon).toBe(45.6);
+  expect(userItems[0].uploadedBy).toBe('skipper');
 });
 
 test('GET /images/:id/exif requires a logged-in user on a secured server', async () => {

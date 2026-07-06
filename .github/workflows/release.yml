@@ -9,6 +9,7 @@ permissions:
   issues: write
   pull-requests: write
   id-token: write
+  actions: write # dispatch signalk-ci.yml at the release tag (for the App Store CI indicator)
 
 jobs:
   release:
@@ -34,3 +35,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
+      # A published release tags the release commit — the exact commit npm records as `gitHead`.
+      # Dispatch the SignalK plugin-ci workflow at that tag so a plugin-ci run exists on that commit;
+      # the App Store registry looks there for a run referencing plugin-ci.yml, and the `[skip ci]`
+      # release commit gets no push-triggered run of its own. workflow_dispatch is the documented
+      # exception that DOES fire under GITHUB_TOKEN. No-op when this push produced no release.
+      - name: Trigger plugin-ci on the release commit
+        run: |
+          TAG="$(git tag --points-at HEAD | grep -E '^v[0-9]' | head -n1)"
+          if [ -n "$TAG" ]; then
+            echo "Released $TAG — dispatching signalk-ci.yml at $TAG"
+            gh workflow run signalk-ci.yml --ref "$TAG"
+          else
+            echo "No release tag on HEAD — nothing to dispatch."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,33 @@
+name: SignalK Plugin CI
+
+# Calls SignalK's reusable plugin-ci workflow (matches the canonical caller example). It packs the
+# plugin and loads it into a real Signal K server across platforms to verify it installs + registers.
+#
+# It runs on pushes/PRs to main for coverage, AND is dispatched by release.yml at each release tag
+# (workflow_dispatch). The release-tag dispatch is what makes the App Store happy: the registry looks
+# for a run referencing plugin-ci.yml on the exact commit npm records as `gitHead`. Our release commit
+# carries `[skip ci]` and is pushed by GITHUB_TOKEN, so no push-triggered run lands on it — the
+# dispatched run does. Without it the registry reports `no-plugin-ci` and docks the score 10 points.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Node is pinned to 24: the plugin uses the built-in `node:sqlite`, which is only un-flagged from
+  # Node 24, so it can't run on Node 20/22 (a Node-22 leg would fail at module load).
+  #
+  # The armv7 (Cerbo GX) leg is left ENABLED on purpose. It runs on Node 20 (Venus OS's version) and
+  # is expected to fail today — an honest, advisory signal that the plugin won't run on a Cerbo GX
+  # until Venus OS ships Node 24. It does not block the run and does not affect the App Store score
+  # (the registry scores a completed plugin-ci run as `ok` regardless of individual job outcomes).
+  # Do not silence it by disabling armv7.
+  plugin-ci:
+    uses: SignalK/signalk-server/.github/workflows/plugin-ci.yml@master
+    with:
+      node-versions: '["24"]'

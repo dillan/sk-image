@@ -31,3 +31,6 @@ jobs:
     uses: SignalK/signalk-server/.github/workflows/plugin-ci.yml@master
     with:
       node-versions: '["24"]'
+      # Run the live integration test (start a real Signal K server, install the plugin, verify it
+      # loads/registers) on Node 24 against signalk-server@latest, instead of leaving it skipped.
+      enable-signalk-integration: true

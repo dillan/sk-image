@@ -1,3 +1,11 @@
+# [1.5.0](https://github.com/dillan/sk-image/compare/v1.4.0...v1.5.0) (2026-07-06)
+
+
+### Features
+
+* report a clear error when the server's Node lacks node:sqlite ([e286727](https://github.com/dillan/sk-image/commit/e286727f8687c14578ae57d9d5fe110077622a52))
+* run on Node 22.13+ by lowering the engines floor ([3433ca1](https://github.com/dillan/sk-image/commit/3433ca1a903d89696939a9aa264fb14424f93e2c)), closes [#55890](https://github.com/dillan/sk-image/issues/55890)
+
 # [1.4.0](https://github.com/dillan/sk-image/compare/v1.3.0...v1.4.0) (2026-07-06)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "sk-image",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Signal K image library plugin: secure upload, on-demand resize/re-encode, disk cache, and a web-app image manager.",
   "author": "Dillan Laughlin",
   "license": "MIT",

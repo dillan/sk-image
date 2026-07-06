@@ -7,7 +7,7 @@ For the full picture of how this fits the docs, see [`../docs/developers/screens
 ## Prerequisites
 
 - **Docker** (with Compose v2) running.
-- **Node.js** on the host (to run the seed, Playwright, and the WebP conversion). You do **not** need Node 24 or a configured Signal K server — the container provides those.
+- **Node.js** on the host (to run the seed, Playwright, and the WebP conversion). You do **not** need Node 22.13 or a configured Signal K server — the container provides those.
 
 ## Run it
 

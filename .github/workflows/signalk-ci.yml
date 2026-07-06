@@ -19,18 +19,18 @@ permissions:
   contents: read
 
 jobs:
-  # Node is pinned to 24: the plugin uses the built-in `node:sqlite`, which is only un-flagged from
-  # Node 24, so it can't run on Node 20/22 (a Node-22 leg would fail at module load).
+  # Tested on Node 22 and 24: the plugin uses the built-in `node:sqlite`, which is un-flagged from
+  # Node 22.13 (v22.13.0, PR #55890), so it runs on Node 22.13+ and 24.
   #
-  # The armv7 (Cerbo GX) leg is left ENABLED on purpose. It runs on Node 20 (Venus OS's version) and
-  # is expected to fail today — an honest, advisory signal that the plugin won't run on a Cerbo GX
-  # until Venus OS ships Node 24. It does not block the run and does not affect the App Store score
-  # (the registry scores a completed plugin-ci run as `ok` regardless of individual job outcomes).
-  # Do not silence it by disabling armv7.
+  # The armv7 (Cerbo GX) leg is left ENABLED on purpose. It runs on Node 20 (Venus OS's version),
+  # where node:sqlite does not exist (added in 22.5), so it is expected to fail today — an honest,
+  # advisory signal that the plugin won't run on a Cerbo GX until Venus OS ships Node 22.13+. It does
+  # not block the run and does not affect the App Store score (the registry scores a completed
+  # plugin-ci run as `ok` regardless of individual job outcomes). Do not silence it by disabling armv7.
   plugin-ci:
     uses: SignalK/signalk-server/.github/workflows/plugin-ci.yml@master
     with:
-      node-versions: '["24"]'
+      node-versions: '["22", "24"]'
       # Run the live integration test (start a real Signal K server, install the plugin, verify it
-      # loads/registers) on Node 24 against signalk-server@latest, instead of leaving it skipped.
+      # loads/registers) on Node 22 and 24 against signalk-server@latest, instead of leaving it skipped.
       enable-signalk-integration: true

@@ -1,6 +1,6 @@
 # Getting started
 
-This guide takes you from nothing to a working image library. It assumes you already have a **Signal K server** running on your boat (on a Raspberry Pi, a Cerbo GX, a small PC, or similar), and that it runs on **Node 24 or newer**.
+This guide takes you from nothing to a working image library. It assumes you already have a **Signal K server** running on your boat (on a Raspberry Pi, a Cerbo GX, a small PC, or similar), and that it runs on **Node 22.13 or newer**.
 
 If you're not sure what Signal K is: it's the free open-source software many boats run to collect and share their instrument data (GPS, depth, wind…). SK Image is an add-on for it that stores and serves a shared photo library for the whole boat.
 
@@ -26,7 +26,7 @@ npm install sk-image
 
 Then restart Signal K.
 
-> **Note:** SK Image needs **Node 24 or newer** (it uses the built-in `node:sqlite`, which is only available un-flagged from Node 24). It also needs internet access on first install to download its dependencies. After that it works offline.
+> **Note:** SK Image needs **Node 22.13 or newer** (it uses the built-in `node:sqlite`, which is available without a flag from Node 22.13). It also needs internet access on first install to download its dependencies. After that it works offline.
 
 ---
 

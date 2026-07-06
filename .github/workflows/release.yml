@@ -18,6 +18,15 @@ jobs:
     if: vars.RELEASE_ENABLED == 'true' && !contains(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
     steps:
+      # semantic-release pushes the "chore(release)" version-bump commit directly to main, which the
+      # branch ruleset rejects for the built-in GITHUB_TOKEN (it can't be a ruleset bypass actor).
+      # Mint a token from a GitHub App that IS on the ruleset's bypass list and push as that.
+      - name: Generate a release token from the GitHub App
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -33,7 +42,9 @@ jobs:
       - run: npm run build
       - run: npx semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The App token (bypasses the ruleset) for the git push + GitHub Release/comments. npm
+          # publishing still uses OIDC (id-token), not this token.
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NPM_CONFIG_PROVENANCE: 'true'
       # A published release tags the release commit — the exact commit npm records as `gitHead`.
       # Dispatch the SignalK plugin-ci workflow at that tag so a plugin-ci run exists on that commit;

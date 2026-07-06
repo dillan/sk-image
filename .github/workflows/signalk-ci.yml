@@ -20,17 +20,18 @@ permissions:
 
 jobs:
   # Tested on Node 22 and 24: the plugin uses the built-in `node:sqlite`, which is un-flagged from
-  # Node 22.13 (v22.13.0, PR #55890), so it runs on Node 22.13+ and 24.
+  # Node 22.13 (v22.13.0, PR #55890), so it targets Node 22.13+ and 24.
   #
-  # The armv7 (Cerbo GX) leg is left ENABLED on purpose. It runs on Node 20 (Venus OS's version),
-  # where node:sqlite does not exist (added in 22.5), so it is expected to fail today — an honest,
-  # advisory signal that the plugin won't run on a Cerbo GX until Venus OS ships Node 22.13+. It does
-  # not block the run and does not affect the App Store score (the registry scores a completed
-  # plugin-ci run as `ok` regardless of individual job outcomes). Do not silence it by disabling armv7.
+  # The reusable workflow's armv7 (Cerbo GX) leg is DISABLED (enable-armv7: false): it runs on Node 20
+  # (Venus OS's version), which the plugin no longer targets — Node 20 lacks node:sqlite (added in 22.5),
+  # and Kip, a primary integration target for sk-image, has also dropped Node 20. Modern 64-bit servers
+  # (arm64 / x64) are covered by the Linux and arm64 legs.
   plugin-ci:
     uses: SignalK/signalk-server/.github/workflows/plugin-ci.yml@master
     with:
       node-versions: '["22", "24"]'
+      # armv7 (Cerbo GX) is pinned to Node 20 in the reusable workflow, which we no longer target.
+      enable-armv7: false
       # Run the live integration test (start a real Signal K server, install the plugin, verify it
       # loads/registers) on Node 22 and 24 against signalk-server@latest, instead of leaving it skipped.
       enable-signalk-integration: true

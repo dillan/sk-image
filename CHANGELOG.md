@@ -1,3 +1,18 @@
+# [1.4.0](https://github.com/dillan/sk-image/compare/v1.3.0...v1.4.0) (2026-07-06)
+
+
+### Bug Fixes
+
+* push releases with a GitHub App token so the branch ruleset allows them ([9b54b79](https://github.com/dillan/sk-image/commit/9b54b79e2f8239d77be4997935f42d98cf0665b9))
+* ship the app icon and changelog in the npm tarball ([5c10e86](https://github.com/dillan/sk-image/commit/5c10e864cd3bb43e9c622528292c38515ce58f09))
+
+
+### Features
+
+* add a revision token so clients can detect changes elsewhere ([01ba001](https://github.com/dillan/sk-image/commit/01ba001ddcfda36a0e7c29527288e88fa6fe4887))
+* **webapp:** fix the upload flow and keep the library live ([a860b28](https://github.com/dillan/sk-image/commit/a860b2888ac9b879165d2c0ae9f93e669305dbd0))
+* **webapp:** poll for changes every 5s instead of 10s ([d14b8c3](https://github.com/dillan/sk-image/commit/d14b8c33feb0c347a70aefdcccdef2152dbe7e0d))
+
 # [1.3.0](https://github.com/dillan/sk-image/compare/v1.2.0...v1.3.0) (2026-07-05)
 
 

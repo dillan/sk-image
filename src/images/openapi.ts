@@ -134,6 +134,27 @@ export function imageOpenApi(): object {
           responses: { '200': jsonResponse('Capabilities', '#/components/schemas/Config') },
         },
       },
+      '/revision': {
+        get: {
+          summary: 'A change token that moves whenever the library or collections change.',
+          description:
+            'Clients poll this to auto-refresh when a change was made elsewhere (e.g. another browser).',
+          responses: {
+            '200': {
+              description: 'Change token',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: { revision: { type: 'integer' } },
+                    required: ['revision'],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       '/images': {
         get: {
           summary:

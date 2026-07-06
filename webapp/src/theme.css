@@ -202,6 +202,23 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+/* Keep an element out of sight but in the layout + a11y tree (so it stays keyboard focusable). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* A label-as-button shows its focus ring when the visually-hidden file input inside it is focused. */
+.btn:focus-within {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
 .iconbtn {
   min-width: var(--tap-min);
   min-height: var(--tap-min);
@@ -467,6 +484,40 @@ body {
   font-size: 18px;
   font-weight: 600;
   color: var(--accent-bright);
+}
+/* The persistent drop zone / upload affordance above the grid. Click, tap, or drop to upload; a
+   full-screen overlay (.dropzone) gives the active-drag feedback. */
+.droparea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 24px;
+  margin-bottom: 16px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.droparea:hover,
+.droparea:focus-within {
+  border-color: var(--accent-bright);
+  color: var(--accent-bright);
+}
+.droparea--empty {
+  padding: 48px 24px;
+}
+.droparea__title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.droparea__hint {
+  font-size: 13px;
+  max-width: 46ch;
 }
 
 /* --- collections list ------------------------------------------------------------------------- */

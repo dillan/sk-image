@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import type { Collection, ImageAsset, SortKey, SortOrder } from '../api';
+import type { Collection, ImageAsset, PluginConfig, SortKey, SortOrder } from '../api';
 import { ImageDetail } from '../components/ImageDetail';
 import { UploadButton } from '../components/UploadButton';
 import { useFileDrop } from '../lib/uploads';
@@ -12,19 +12,29 @@ function meta(image: ImageAsset): string {
   return `${dims} · ${formatBytes(image.bytes)}`;
 }
 
+/** Data-driven upload limits shown under the drop zone, sourced from GET /config. */
+function limitsHint(config: PluginConfig | null): string | null {
+  if (!config) return null;
+  const formats = config.supportedFormats.map((f) => f.toUpperCase()).join(', ');
+  return `${formats} · up to ${formatBytes(config.maxUploadBytes)} each · ${config.maxImageCount} images max`;
+}
+
 export function LibraryScreen({
   collections,
   enqueue,
   uploadTick,
+  config,
 }: {
   collections: Collection[];
   enqueue: (files: File[]) => void;
   uploadTick: number;
+  config: PluginConfig | null;
 }) {
   const [images, setImages] = useState<ImageAsset[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sort, setSort] = useState<SortKey>('date');
-  const [order, setOrder] = useState<SortOrder>('desc');
+  // First visit defaults to name A–Z; the user can switch to date or flip the order.
+  const [sort, setSort] = useState<SortKey>('name');
+  const [order, setOrder] = useState<SortOrder>('asc');
   const [collection, setCollection] = useState<string>('');
   const [selected, setSelected] = useState<ImageAsset | null>(null);
   const reqToken = useRef(0);
@@ -49,6 +59,8 @@ export function LibraryScreen({
   useEffect(() => refresh(), [refresh, uploadTick]);
 
   const drop = useFileDrop(enqueue);
+  const hint = limitsHint(config);
+  const isEmpty = !!images && images.length === 0 && !error;
 
   return (
     <div className="library" {...drop.handlers}>
@@ -113,14 +125,32 @@ export function LibraryScreen({
         )}
       </div>
 
-      {error && <div className="chip chip--caution">Couldn&apos;t load images ({error})</div>}
-
-      {images && images.length === 0 && !error && (
-        <div className="empty">
-          <p>No images{collection ? ' in this collection' : ''} yet.</p>
+      <label className={`droparea${isEmpty ? ' droparea--empty' : ''}`}>
+        {/* A label+input so tap/click/keyboard opens the picker — drag-drop isn't available on iOS. */}
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          aria-label="Upload images"
+          className="visually-hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            if (files.length) enqueue(files);
+            e.target.value = '';
+          }}
+        />
+        <div className="droparea__title">Drag and drop images here, or browse files</div>
+        {isEmpty && !collection && (
           <p className="muted">Upload a diagram, safety card, or photo to get started.</p>
-        </div>
-      )}
+        )}
+        {isEmpty && collection && <p className="muted">No images in this collection yet.</p>}
+        {collection && (
+          <p className="muted">New uploads go to the whole library, not this collection.</p>
+        )}
+        {hint && <div className="droparea__hint">{hint}</div>}
+      </label>
+
+      {error && <div className="chip chip--caution">Couldn&apos;t load images ({error})</div>}
 
       {images && images.length > 0 && (
         <div className="grid">

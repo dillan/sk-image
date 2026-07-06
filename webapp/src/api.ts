@@ -56,6 +56,27 @@ function loginRedirect(): never {
   window.location.href = loginUrl();
   throw new Error('Login required');
 }
+/** Navigate to the Signal K login (no throw) — used to redirect once after a failed write. */
+export function goToLogin(): void {
+  window.location.href = loginUrl();
+}
+
+/**
+ * Thrown by an upload when the server answers 401. Uploading a batch surfaces this so the queue can
+ * stop on the first auth failure and redirect to login once, instead of every file failing in turn.
+ */
+export class AuthRequiredError extends Error {
+  constructor() {
+    super('Log in to upload');
+    this.name = 'AuthRequiredError';
+  }
+}
+/** Robust across module boundaries (name check, not just instanceof). */
+export function isAuthRequired(e: unknown): boolean {
+  return (
+    e instanceof AuthRequiredError || (e as { name?: string } | null)?.name === 'AuthRequiredError'
+  );
+}
 
 /** Abort an upload if no progress event fires for this long — catches a stalled connection. */
 const STALL_MS = 45000;
@@ -125,9 +146,8 @@ function uploadWithProgress(file: File, opts: UploadOptions = {}): Promise<Image
           reject(new Error('Unexpected upload response'));
         }
       } else if (xhr.status === 401) {
-        // Settle the promise BEFORE navigating — a throw here would never reach the awaiting caller.
-        reject(new Error('Login required'));
-        window.location.href = loginUrl();
+        // Don't redirect here — reject so the queue can stop the whole batch and redirect once.
+        reject(new AuthRequiredError());
       } else {
         let message = xhr.statusText;
         try {
@@ -164,6 +184,17 @@ function uploadWithProgress(file: File, opts: UploadOptions = {}): Promise<Image
 
 export const api = {
   config: () => req<PluginConfig>('/config'),
+
+  /**
+   * A cheap change token; poll it and refresh when it differs from the last seen value. Uses a raw
+   * fetch (not `req`) so a background poll never redirects to login on a 401 — it returns null and the
+   * caller skips the tick.
+   */
+  revision: async (): Promise<{ revision: number } | null> => {
+    const res = await fetch(`${BASE}/revision`, { credentials: 'include' });
+    if (!res.ok) return null;
+    return (await res.json()) as { revision: number };
+  },
 
   list: (opts: { sort?: SortKey; order?: SortOrder; collection?: string } = {}) => {
     const q = new URLSearchParams();

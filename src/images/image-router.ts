@@ -99,6 +99,14 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
     res.json(deps.getConfig ? deps.getConfig() : {});
   });
 
+  // GET /revision — a cheap change token. It changes whenever the library or collections change, so
+  // clients can poll it and refresh when a change was made elsewhere (e.g. another browser). Read-only.
+  router.get(p('/revision'), (_req: Request, res: Response) => {
+    const store = getStore(res);
+    if (!store) return;
+    res.json({ revision: store.revision() });
+  });
+
   // POST /images — upload (auth required; auth is checked BEFORE multipart parsing).
   router.post(p('/images'), (req: Request, res: Response) => {
     if (!requireWrite(req, res, 'upload images')) return;
@@ -121,6 +129,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
             file.originalname,
             principalId(req as SkRequest),
           );
+          store.bumpRevision();
           return sendJson(res, 201, { ...meta, url: `images/${meta.id}` });
         } catch (e) {
           if (e instanceof ImageValidationError) return sendError(res, 415, e.message);
@@ -211,6 +220,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
       try {
         const removed = await store.remove(id);
         if (!removed) return sendError(res, 404, 'Image not found');
+        store.bumpRevision();
         res.json({ ok: true });
       } catch {
         sendError(res, 500, 'Failed to delete image');
@@ -260,7 +270,9 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
     const store = getStore(res);
     if (!store) return;
     try {
-      return sendJson(res, 201, store.createCollection(name));
+      const created = store.createCollection(name);
+      store.bumpRevision();
+      return sendJson(res, 201, created);
     } catch {
       return sendError(res, 500, 'Failed to create collection');
     }
@@ -277,6 +289,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
     if (!store) return;
     try {
       if (!store.renameCollection(id, name)) return sendError(res, 404, 'Collection not found');
+      store.bumpRevision();
       return res.json({ ok: true });
     } catch {
       return sendError(res, 500, 'Failed to rename collection');
@@ -292,6 +305,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
     if (!store) return;
     try {
       if (!store.deleteCollection(id)) return sendError(res, 404, 'Collection not found');
+      store.bumpRevision();
       return res.json({ ok: true });
     } catch {
       return sendError(res, 500, 'Failed to delete collection');
@@ -310,6 +324,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
       if (!store.addImageToCollection(id, imageId)) {
         return sendError(res, 404, 'Collection or image not found');
       }
+      store.bumpRevision();
       return res.json({ ok: true });
     } catch {
       return sendError(res, 500, 'Failed to add image to collection');
@@ -328,6 +343,7 @@ export function registerImageRoutes(router: IRouter, deps: ImageRouterDeps, base
       if (!store.removeImageFromCollection(id, imageId)) {
         return sendError(res, 404, 'Image not in collection');
       }
+      store.bumpRevision();
       return res.json({ ok: true });
     } catch {
       return sendError(res, 500, 'Failed to remove image from collection');

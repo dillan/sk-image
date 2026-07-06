@@ -49,6 +49,23 @@ describe('api', () => {
     expect(init?.body).toBe(JSON.stringify({ name: 'Deck' }));
   });
 
+  it('revision fetches the change token and returns null on a non-OK response (no redirect)', async () => {
+    const fetchMock = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(okResponse(200, { revision: 7 })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const r = await api.revision();
+    expect(r?.revision).toBe(7);
+    expect(fetchMock.mock.calls[0][0]).toBe('/signalk/v1/api/sk-image/revision');
+
+    // A 401 must NOT redirect a background poll — it just returns null.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, _init?: RequestInit) => Promise.resolve(okResponse(401, {}))),
+    );
+    expect(await api.revision()).toBeNull();
+  });
+
   it('surfaces a server error message', async () => {
     vi.stubGlobal(
       'fetch',

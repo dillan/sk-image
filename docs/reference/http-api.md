@@ -26,6 +26,10 @@ Capabilities discovery. Clients read this instead of hard-coding limits.
 }
 ```
 
+## `GET /revision`
+
+A cheap change token: `{ "revision": <number> }`. It changes whenever the library or collections change (upload, delete, or a collection edit). The web app polls it and refreshes when it moves, so a change made in one browser shows up in another. Read-only.
+
 ## `POST /images`
 
 Upload an image. `multipart/form-data` with a single `file` field. **Write access required.**

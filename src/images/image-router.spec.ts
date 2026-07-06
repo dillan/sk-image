@@ -142,6 +142,37 @@ test('default (empty) basePath keeps the /plugins/sk-image routes unprefixed', (
   expect(router.postHandlers.has('/images')).toBe(true);
 });
 
+test('GET /revision changes after a successful mutation (drives cross-client auto-refresh)', async () => {
+  const { store, router } = setup();
+  const readRevision = async (): Promise<number> => {
+    const res = createResMock();
+    router.getHandlers.get('/revision')!({}, res);
+    await res.done;
+    return (res.jsonBody as { revision: number }).revision;
+  };
+
+  const before = await readRevision();
+
+  const created = createResMock();
+  router.postHandlers.get('/collections')!({ ...AUTH, body: { name: 'Deck' } }, created);
+  await created.done;
+  expect(created.statusCode).toBe(201);
+
+  expect(await readRevision()).not.toBe(before);
+  expect(store.revision()).toBeGreaterThan(before);
+});
+
+test('GET /revision does not change on a read', async () => {
+  const { router } = setup();
+  const readRevision = async (): Promise<number> => {
+    const res = createResMock();
+    router.getHandlers.get('/revision')!({}, res);
+    await res.done;
+    return (res.jsonBody as { revision: number }).revision;
+  };
+  expect(await readRevision()).toBe(await readRevision());
+});
+
 afterAll(() => {
   for (const s of opened) {
     try {

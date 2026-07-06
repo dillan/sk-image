@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import { api } from '../api';
+import { api, isAuthRequired } from '../api';
 
 export type UploadStatus = 'queued' | 'uploading' | 'done' | 'error' | 'cancelled';
 
@@ -101,7 +101,7 @@ let nextId = 0;
  *
  * Intended to live above the router so uploads survive tab changes.
  */
-export function useUploadQueue(maxBytes: number, onEach: () => void) {
+export function useUploadQueue(maxBytes: number, onEach: () => void, onAuthRequired: () => void) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [speed, setSpeed] = useState(0);
   const itemsRef = useRef<UploadItem[]>([]);
@@ -112,6 +112,8 @@ export function useUploadQueue(maxBytes: number, onEach: () => void) {
   const sample = useRef({ t: 0, loaded: 0 });
   const onEachRef = useRef(onEach);
   onEachRef.current = onEach;
+  const onAuthRequiredRef = useRef(onAuthRequired);
+  onAuthRequiredRef.current = onAuthRequired;
 
   const commit = useCallback((next: UploadItem[]) => {
     itemsRef.current = next;
@@ -165,6 +167,21 @@ export function useUploadQueue(maxBytes: number, onEach: () => void) {
         patch(current.id, { status: 'done', loaded: current.size });
         onEachRef.current();
       } catch (e) {
+        if (isAuthRequired(e)) {
+          // The user isn't logged in. Stop the whole batch on this first failure and send them to
+          // log in once — rather than letting every remaining file fail and redirect in turn.
+          cancelledRef.current = true;
+          commit(
+            itemsRef.current.map((it) =>
+              it.status === 'queued' || it.status === 'uploading'
+                ? { ...it, status: 'error' as const, error: 'Log in to upload' }
+                : it,
+            ),
+          );
+          filesRef.current.clear();
+          onAuthRequiredRef.current();
+          break;
+        }
         const aborted = (e as Error).name === 'AbortError' || cancelledRef.current;
         patch(
           current.id,

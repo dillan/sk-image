@@ -13,7 +13,7 @@ import { api, goToLogin } from './api';
 import type { Collection, PluginConfig } from './api';
 
 /** How often to poll the change token so edits made in another browser show up here. */
-const REVISION_POLL_MS = 10_000;
+const REVISION_POLL_MS = 5_000;
 
 const NAV: { cluster: Cluster; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { cluster: 'library', label: 'Library', Icon: LibraryIcon },

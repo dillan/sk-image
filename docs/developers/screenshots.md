@@ -2,7 +2,7 @@
 
 The screenshots in these docs are **generated, not hand-taken**. A single command spins up a real Signal K server with SK Image installed, seeds it with synthetic sample data, drives the web app with Playwright, and writes fresh WebP images into `docs/images/`. That keeps the pictures in the guides honest — they always reflect the current UI — and reproducible by anyone, on any machine with Docker.
 
-> **Start here.** Everything lives in the `e2e/` directory. To refresh every screenshot: `cd e2e && ./capture.sh`. Stop the stack afterwards with `./capture.sh --down`. You do not need a local Node 24 or a configured Signal K server — the Docker image carries all of that.
+> **Start here.** Everything lives in the `e2e/` directory. To refresh every screenshot: `cd e2e && ./capture.sh`. Stop the stack afterwards with `./capture.sh --down`. You do not need a local Node 22.13 or a configured Signal K server — the Docker image carries all of that.
 
 ---
 

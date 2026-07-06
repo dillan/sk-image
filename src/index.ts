@@ -13,6 +13,7 @@ import { WIDTH_ALLOWLIST } from './images/image-processing';
 import { registerImageRoutes, SK_IMAGE_MOUNT } from './images/image-router';
 import { createImageResourceProvider } from './images/image-resources';
 import { imageOpenApi } from './images/openapi';
+import { checkSqliteSupport, MIN_NODE_FOR_SQLITE } from './images/sqlite-support';
 
 /**
  * SK Image — a standalone Signal K server plugin that owns the boat's image library:
@@ -65,6 +66,7 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
   let store: ImageStore | null = null;
   let configuredMaxCacheBytes = DEFAULT_MAX_CACHE_BYTES;
   let initFailed = false;
+  let sqliteUnsupported = false;
   let resourceProviderRegistered = false;
 
   // Built lazily on first route use — the data dir is only known once the server has initialized.
@@ -140,6 +142,22 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
       configuredMaxCacheBytes =
         typeof value === 'number' && value > 0 ? value : DEFAULT_MAX_CACHE_BYTES;
       initFailed = false;
+      // Fail loudly-but-gracefully on a Node too old for the built-in node:sqlite (needs >= 22.13):
+      // report a clear, actionable status instead of crashing the plugin at load. See sqlite-support.ts.
+      sqliteUnsupported = false;
+      const support = checkSqliteSupport();
+      if (!support.ok) {
+        sqliteUnsupported = true;
+        app.error(support.detail);
+        app.setPluginError(
+          `${support.detail} The image library is disabled — update Node, then restart Signal K.`,
+        );
+        raiseStoreUnavailable(
+          app,
+          `needs Node ${MIN_NODE_FOR_SQLITE}+, server runs Node ${process.versions.node}`,
+        );
+        return;
+      }
       // Publish image metadata as the v2 `images` resource type (discoverable + crew-readable).
       // Guarded: older servers lack the API, and it must register once per process.
       if (!resourceProviderRegistered && typeof app.registerResourceProvider === 'function') {
@@ -164,6 +182,8 @@ export = function skImagePlugin(app: ServerAPI): Plugin {
       app.setPluginStatus('Stopped');
     },
     statusMessage: () => {
+      if (sqliteUnsupported)
+        return `Disabled: needs Node ${MIN_NODE_FOR_SQLITE}+ (this server runs Node ${process.versions.node})`;
       if (initFailed) return 'Image store unavailable — see server log';
       if (!store) return 'Ready';
       return `${store.imageCount()} images · cache budget ${fmtBytes(configuredMaxCacheBytes)}`;

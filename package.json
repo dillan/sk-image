@@ -18,7 +18,7 @@
   "types": "dist/index.d.ts",
   "packageManager": "npm@11.16.0",
   "engines": {
-    "node": ">=24"
+    "node": ">=22.13.0"
   },
   "files": [
     "dist",
@@ -88,7 +88,7 @@
     "@signalk/server-api": "^2.30.0",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.2.0",
-    "@types/node": "^24.13.2",
+    "@types/node": "^22.20.0",
     "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^10.6.0",
     "globals": "^17.7.0",

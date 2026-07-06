@@ -12,8 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # node:sqlite is only available un-flagged from Node 24, so 24 LTS is the floor.
-        node: [24]
+        # node:sqlite is un-flagged from Node 22.13, so 22.13+ is the floor; test 22 and 24 LTS.
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6

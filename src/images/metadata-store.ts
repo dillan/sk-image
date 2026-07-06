@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync } from 'node:sqlite';
 import { renameSync } from 'node:fs';
 import type { ImageFormat, ImageMeta } from './image-store';
 
@@ -120,9 +120,13 @@ export class MetadataStore {
    * every route with a 503.
    */
   private static open(dbPath: string): DatabaseSync {
+    // Load node:sqlite lazily so merely importing this module never throws on a Node too old to have
+    // it — the plugin's startup capability check (sqlite-support.ts) reports that case cleanly instead.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sqlite = require('node:sqlite') as typeof import('node:sqlite');
     let db: DatabaseSync | undefined;
     try {
-      db = new DatabaseSync(dbPath);
+      db = new sqlite.DatabaseSync(dbPath);
       db.exec(SCHEMA); // forces a header read; throws ERR_SQLITE_ERROR on a corrupt file
       return db;
     } catch (e) {
@@ -138,7 +142,7 @@ export class MetadataStore {
       } catch {
         // best effort — if we can't move it, the retry below surfaces the real error
       }
-      const fresh = new DatabaseSync(dbPath);
+      const fresh = new sqlite.DatabaseSync(dbPath);
       fresh.exec(SCHEMA);
       return fresh;
     }

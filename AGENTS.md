@@ -32,7 +32,7 @@ npm run format         # prettier --write .
 
 ## Conventions
 
-- Node >= 24 (the built-in `node:sqlite` is only un-flagged from Node 24). CommonJS output (`module: node16`, no `"type"`).
+- Node >= 22.13 (the built-in `node:sqlite` is un-flagged from Node 22.13). CommonJS output (`module: node16`, no `"type"`).
 - Vitest specs co-located with source. Add a failing spec before implementing.
 - Conventional Commits; releases via semantic-release.
 - Prettier (single quotes, width 100) + ESLint flat config gate every change.
